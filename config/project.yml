@@ -1,0 +1,6 @@
+# Unicode blocks available in unicode-blocks.json
+# Add only existing and in-development blocks
+blocks:
+  - Basic Latin
+  - Latin-1 Supplement
+#  - Box Drawing

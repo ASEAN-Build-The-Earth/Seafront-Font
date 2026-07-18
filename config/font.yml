@@ -1,0 +1,73 @@
+# ========================
+# Typeface Metadata
+# ========================
+typeface:
+  style:
+    regular: "Regular"
+    monospace: "Mono" # Not yet implemented
+    italic: "Italic" # Not yet implemented
+    bold: "Bold" # Not yet implemented
+  info:
+    family-name: "BTE Seafront"
+    custom-name: "Basic" # Optional, custom name appended on family name, ex. "Basic" as BTE Seafront Basic
+    version: "Version Beta 1.000"
+    designer: "BuildTheEarth Community"
+    description: "A pixelated style typeface developed by the BuildTheEarth Community."
+    manufacturer: "ASEAN-BTE"
+    vendor-url: "https://github.com/ASEAN-Build-The-Earth/Seafront-Font"
+    designer-url: "https://buildtheearth.net/"
+    sample-text: |
+      The quick brown fox jumps over the lazy dog.
+      0 1 2 3 4 5 6 7 8 9 
+      A B C D E F G H I J K L M N O P Q R S T U V W X Y Z 
+      a b c d e f g h i j k l m n o p q r s t u v w x y z 
+      ! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ ` { | } ~
+# ========================
+# Font profile
+# All units per pixel
+# ========================
+profile:
+  # ========================
+  # Typography specific variables
+  # Do not change if necessary
+  # ========================
+  typography:
+    origin-x: 22
+    origin-y: 16
+    x-height: 16
+    cap-height: 20
+    white-space: 10
+    right-padding: 3
+    italic-angle: -12
+  # ========================
+  # Unit scaling
+  # Doesn't affect visually, but internally how each pixel is mapped on a font coordinate
+  # ========================
+  scale:
+    # Recommend 1024(768:256) UPM
+    # Base scale, fit on power of 2
+    base: 32
+    # Recommend 2000(1500:500) UPM
+    # Pixel positions will cleanly snap at 0, 100, 200, 300, ...
+    # in full pixels and 50, 150, 250, 350, ... in half pixels
+    half: 50
+    # Every pixel will snap at 0, 100, 200, 300
+    full: 100
+  # ========================
+  # The font's "Accent"
+  # Affect how the font is visually placed along typography line
+  # ascender: how many pixel the font usually occupied above typing baseline
+  # descender: how many pixel the font usually occupied below typing baseline
+  # ========================
+  # What make different are ratio per ascender:descender,
+  # recommended around 80%:20%, 75%:25%
+  accent:
+    base:
+      ascender: 24
+      descender: 8
+    half:
+      ascender: 30
+      descender: 10
+    full:
+      ascender: 34
+      descender: 15
