@@ -2,16 +2,24 @@
 # Typeface Metadata
 # ========================
 typeface:
+  family:
+    - "Seafront"
+    - "Seafront Square"
   style:
     regular: "Regular"
-    monospace: "Mono" # Not yet implemented
-    italic: "Italic" # Not yet implemented
-    bold: "Bold" # Not yet implemented
+    monospace: "Mono"
+    bold: "Bold"
   info:
-    family-name: "BTE Seafront"
-    custom-name: "Basic" # Optional, custom name appended on family name, ex. "Basic" as BTE Seafront Basic
-    version: "Version Beta 1.000"
-    designer: "BuildTheEarth Community"
+    # ========================
+    # Foundry name - an identifying prefix for the font.
+    # Commonly it's a standard in which a font is created for, ex. TT for TrueType font.
+    # But its barely used anymore. We will use "BTE" as the our font identifying prefix.
+    # ========================
+    foundry-name: "BTE"
+    version: "Version 1.000"
+    designer: > 
+      Lead designer: chr7s-c, tin. 
+      With contributions from the BuildTheEarth Community.
     description: "A pixelated style typeface developed by the BuildTheEarth Community."
     manufacturer: "ASEAN-BTE"
     vendor-url: "https://github.com/ASEAN-Build-The-Earth/Seafront-Font"
@@ -32,6 +40,7 @@ profile:
   # Do not change if necessary
   # ========================
   typography:
+    maximum-width: 30
     origin-x: 22
     origin-y: 16
     x-height: 16
@@ -39,6 +48,7 @@ profile:
     white-space: 10
     right-padding: 3
     italic-angle: -12
+    monospace-width: 16
   # ========================
   # Unit scaling
   # Doesn't affect visually, but internally how each pixel is mapped on a font coordinate
@@ -56,18 +66,21 @@ profile:
   # ========================
   # The font's "Accent"
   # Affect how the font is visually placed along typography line
-  # ascender: how many pixel the font usually occupied above typing baseline
-  # descender: how many pixel the font usually occupied below typing baseline
+  # ascender - how many pixel the font usually occupied above typing baseline
+  # descender - how many pixel the font usually occupied below typing baseline
   # ========================
   # What make different are ratio per ascender:descender,
   # recommended around 80%:20%, 75%:25%
   accent:
+    # 32*32 Pixel Bitmap
     base:
       ascender: 24
       descender: 8
+    # 40*40 Pixel Bitmap
     half:
       ascender: 30
       descender: 10
+    # 48*48 Pixel Bitmap
     full:
       ascender: 34
-      descender: 15
+      descender: 14

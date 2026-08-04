@@ -32,8 +32,8 @@ CONFIG: Path = ROOT / "config"
 PROJECT: Path = CONFIG / "project.yml"
 FONT: Path = CONFIG / "font.yml"
 
-def to_glyphs_dir(block: str, style: str) -> Path:
-    return ROOT / "src" / block / "glyphs" / style
+def to_glyphs_dir(block: str, family: str, style: str) -> Path:
+    return ROOT / "src" / block / "glyphs" / family / style
 
 def load_yaml(file: Path):
     with open(file, encoding="utf-8") as fp:
@@ -96,21 +96,38 @@ def prepare_glyphs(default_width: int) -> dict:
 
 def build_glyph(pbm: Path,
                 glyph: dict,
-                profile) -> int:
+                profile,
+                accent) -> int:
     """
 
     :param pbm: Path to the glyph's bitmap to build
     :param glyph:
     :param profile:
+    :param accent:
     :return: 1 if the glyph is successfully built in to dictionary, else 0
     """
     v: bool = profile["verbose"]
     codepoint: int = profile["codepoint"]
     pixel_size: int = profile["pixel_size"]
     white_space: int = profile["typography"]["white-space"]  # The white-space width
-    origin_x: int = profile["typography"]["origin-x"]
-    origin_y: int = CELL_SIZE - profile["typography"]["origin-y"]  # 42: image coordinates
     right_padding: int = profile["typography"]["right-padding"]  # The padding between every character
+
+    # PBM Cell: The dimension of glyph pbm file
+    # TODO: currently is coded to reflect each font's designed accent
+    # TODO: might consider making this more dynamic
+    pbm_cell: int = accent["ascender"] + accent["descender"]
+
+    origin_x: int = pbm_cell - profile["typography"]["maximum-width"]
+    origin_y: int = accent["ascender"]
+
+    image = Image.open(pbm)
+    w, h = image.size
+
+    if w != pbm_cell or h != pbm_cell:
+        raise ValueError(
+            f"Glyphs .pbm has mismatch accent dimension. "
+            f"Expected {pbm_cell}*{pbm_cell}, Got {w}*{h} at:\n'{pbm}'"
+        )
 
     # Special case for space character (U+0020)
     if codepoint == 32:
@@ -125,8 +142,6 @@ def build_glyph(pbm: Path,
         glyph["cmap"][codepoint] = glyph_name
         return 1
 
-    image = Image.open(pbm)
-    w, h = image.size
     pixels = image.load()
     fn = lambda x, y: pixels[x, y] if pixels is not None else 1
     boundary = extract(fn, w, h, origin_x, origin_y, pixel_size)
@@ -140,9 +155,21 @@ def build_glyph(pbm: Path,
     glyph_width = max_x - min_x + 1
     glyph_height = max_y - min_y + 1
 
-    # The starting points
-    lsb = (origin_x - min_x) * pixel_size
-    advance = (max_x - origin_x + 1 + right_padding) * pixel_size
+    # lsb & advance
+    # This 2 metrics determined how glyph is displayed relative to its "advance" width
+    # The "lsb" is the starting point of the glyph's minimum point
+
+    start_padding = 0
+    advance_width = max_x - origin_x + 1
+
+    # Only monospace will need special care to ensure every glyph has same width
+    if profile["typeface"] == "monospace":
+        # The left-over space if some character is smaller than monospace width
+        advance_width = profile["typography"]["monospace-width"]
+        start_padding = advance_width - glyph_width
+
+    lsb = (origin_x - min_x + start_padding) * pixel_size
+    advance = (advance_width + right_padding) * pixel_size
     log(v, f"U+{codepoint:04X}"
         f" bounds=({min_x},{min_y})-({max_x},{max_y}),"
         f" size={glyph_width}x{glyph_height},"
@@ -174,6 +201,10 @@ def export(typeface, profile, output):
               f"Please either lower your scale or step down the accent{'\033[0m'}", file=sys.stderr)
         return
 
+    print(f"Default width: {units_per_em // 2}")
+    print(f"MAX width: {profile["typography"]["maximum-width"] * pixel_size}")
+
+    family_name = typeface["info"]["family"]
     project = load_yaml(PROJECT)
     blocks = load_unicode_blocks()
     glyph = prepare_glyphs(units_per_em // 2) # Defaulting half an em per glyph for .notdef
@@ -181,12 +212,12 @@ def export(typeface, profile, output):
 
     try:
         for block_id in project["blocks"]:
-            style = str(typeface["style"]).lower()
-            glyph_dir: Path = to_glyphs_dir(block_id, style)
+            face = typeface["face"]
+            glyph_dir: Path = to_glyphs_dir(block_id, family_name, face)
 
             if not glyph_dir.exists():
                 raise ValueError(
-                    f"Glyphs for '{block_id}' with style '{style}' referenced in project.yml "
+                    f"Glyphs for '{block_id}' with style '{face}' referenced in project.yml "
                     f"does not exist for exporting at: \n'{glyph_dir}'"
                 )
 
@@ -197,10 +228,11 @@ def export(typeface, profile, output):
                     "codepoint": codepoint,
                     "pixel_size": pixel_size,
                     "verbose": v,
+                    "typeface": face,
                     "typography": profile["typography"]
                 }
                 log(v, f"Building Glyph index: {index} (U+{codepoint:04X})")
-                built += build_glyph(pbm, glyph, glyph_profile)
+                built += build_glyph(pbm, glyph, glyph_profile, profile["accent"])
     except Exception as e:
         print(f"{'\033[93m'}{e}{'\033[0m'}", file=sys.stderr)
     if built == 0:
@@ -246,22 +278,21 @@ def export(typeface, profile, output):
     info: dict[str, str] = typeface["info"]
     license_desc: list[str] = LICENSE.splitlines()
     license_info: str = license_desc[len(license_desc) - 1]
-    strings_list: list[str] = [info["family-name"]]
-
-    if info["custom-name"]:
-        strings_list.append(info["custom-name"])
+    strings_list: list[str] = [info["foundry-name"], family_name]
+    family_name = ' '.join(strings_list) # BTE Seafront
 
     strings_list.append(typeface["style"])
+    full_name: str = ' '.join(strings_list) # BTE Seafront Regular
 
-    full_name: str = ' '.join(strings_list)
     postscript: str = full_name.replace(' ', '-')
+
     strings_list.append(info["version"])
-    unique_string: str = ' '.join(strings_list)
+    unique_string: str = ' '.join(strings_list) # BTE Seafront Regular Version 1.000
 
     name_strings: dict[str, str] = {
         # (nameID 0)
         "copyright": COPYRIGHT,
-        "familyName": info["family-name"], # (nameID 1)
+        "familyName": family_name, # (nameID 1)
         "styleName": typeface["style"], # (nameID 2)
         "uniqueFontIdentifier": unique_string, # (nameID 3)
         "fullName": full_name, # (nameID 4)
@@ -276,7 +307,7 @@ def export(typeface, profile, output):
         "licenseDescription": LICENSE, # (nameID 13)
         "licenseInfoURL": license_info, # (nameID 14)
         # (nameID 15 reserved)
-        "typographicFamily": info["family-name"], # (nameID 16)
+        "typographicFamily": info["family"], # (nameID 16)
         "typographicSubfamily": typeface["style"], # (nameID 17)
         "compatibleFullName": full_name, # (nameID 18)
         "sampleText": info["sample-text"], # (nameID 19)
@@ -306,27 +337,33 @@ def main():
 
     parser = argparse.ArgumentParser(description='Export a TrueType font from this project')
 
-    profile_options = ["base", "half", "full"]
-    typeface_options = ["regular", "bold", "monospace"] # italic can be font attribute
+    accent_options = [*config["profile"]["accent"]]
+    typeface_options = [*config["typeface"]["style"]]
+    family_options = config["typeface"]["family"]
 
     parser.add_argument('-v', "--verbose",
         default=False,
         type=bool,
         help="log verbose outputs",
     )
+    parser.add_argument('-i', "--identifier",
+        nargs="?",
+        type=str,
+        help="The font's version number to export ex. 1.000",
+    )
 
     parser.add_argument('-s', "--scale",
-        default=profile_options[0],
-        choices=profile_options,
+        default=accent_options[0],
+        choices=accent_options,
         help="The scale preset that affect the font's internal positioning.\n"
-             f"Default to '{profile_options[0]}'",
+             f"Default to '{accent_options[0]}'",
     )
 
     parser.add_argument('-a', "--accent",
-        default=profile_options[0],
-        choices=profile_options,
+        default=accent_options[0],
+        choices=accent_options,
         help="The accent preset of this font which define the ascent\n"
-             f"and descend line of this font, Default to '{profile_options[0]}'",
+             f"and descend line of this font, Default to '{accent_options[0]}'",
     )
 
     parser.add_argument(
@@ -338,9 +375,10 @@ def main():
     )
 
     parser.add_argument(
-        "-c", "--custom-name",
-        type=str,
-        help="Optional, custom name appended on family name, ex. \"Basic\": BTE Seafront Basic",
+        "-c", "--family",
+        default=family_options[0],
+        choices=family_options,
+        help="The family name to export",
     )
 
     parser.add_argument(
@@ -371,10 +409,14 @@ def main():
     assert_profile("scale")
     assert_profile("accent")
 
-    if args.custom_name:
-        config["typeface"]["info"]["custom-name"] = args.custom_name
+    if args.family:
+        config["typeface"]["info"]["family"] = args.family
+
+    if args.identifier:
+        config["typeface"]["info"]["version"] = f"Version {args.identifier}"
 
     typeface: dict = {
+        "face": face,
         "style": config["typeface"]["style"][face],
         "info": config["typeface"]["info"]
     }

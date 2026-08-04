@@ -1,11 +1,12 @@
--- Copyright (c) 2026, BuildTheEarth (buildtheearth.net),
--- with Reserved Font Name "BTE Seafront".
--- Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).
---
--- This Font Software is licensed under the SIL Open Font License, Version 1.1.
--- This license is available with a FAQ at:
--- https://openfontlicense.org
+--[[
+Copyright (c) 2026, BuildTheEarth (buildtheearth.net),
+with Reserved Font Name "BTE Seafront".
+Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).
 
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is available with a FAQ at:
+https://openfontlicense.org
+--]]
 ------------------------------------------------------------
 -- create-project.lua
 --
@@ -14,18 +15,25 @@
 ------------------------------------------------------------
 
 local dir = app.params["dir"]
+local config = app.params["config"]
 
 if not dir then
     error("Missing script parameter: dir")
 end
+if not config then
+    error("Missing script parameter: config")
+end
 
 local fontTablePath = dir .. "/font-table.png"
-local graphicsPath = dir .. "/regular.png"
+local designPath = dir .. "/design/"
 local outputPath = dir .. "/design.aseprite"
+local configPath = config .. "/font.yml"
+
+simpleyaml = require("simpleyaml")
+
+local font = simpleyaml.parse_file(configPath, "typeface")
 
 local tableSprite = app.open(fontTablePath)
-local graphicsSprite = app.open(graphicsPath)
-
 local width = tableSprite.width
 local height = tableSprite.height
 local colorMode = tableSprite.colorMode
@@ -34,9 +42,51 @@ local sprite = Sprite(width, height, colorMode)
 
 sprite.filename = outputPath
 
+-- Delete the default background layer
 app.transaction(function()
     sprite:deleteLayer(sprite.layers[1])
 end)
+
+function loadDesign(folder)
+     local typeface = {
+        families = {} -- name, designs
+    }
+
+    -- For each sub directory in design folder
+    for _, path in ipairs(app.fs.listFiles(folder)) do
+        -- The path name will annotate the font family name
+        local familyName = path
+        local directory = app.fs.joinPath(folder, familyName)
+        local family = {
+            name = familyName, -- string
+            designs = {} -- style, path
+        }
+
+        print("Path: " .. directory)
+
+        if not app.fs.isDirectory(directory) then
+            print("WARNING: Missing family directory: " .. directory)
+        else
+            for _, path in ipairs(app.fs.listFiles(directory)) do
+                if path:lower():match("%.png$") then
+                    local filename = app.fs.fileName(path)
+                    local style = filename:gsub("%.png$", "")
+
+                    print("Found: " .. style .. " For " .. familyName)
+                    table.insert(family.designs, {
+                        style = style,
+                        path = app.fs.joinPath(directory, path)
+                    })
+                end
+            end
+        end
+
+        table.insert(typeface.families, family)
+    end
+
+    return typeface
+end
+
 
 ------------------------------------------------------------
 -- Font Table layer
@@ -57,19 +107,50 @@ local tableCel = sprite:newCel(
 -- Graphics layer
 ------------------------------------------------------------
 
-local graphicsLayer = sprite:newLayer()
-graphicsLayer.name = "Regular"
+local typeface = loadDesign(designPath)
+local graphicsGroup = sprite:newGroup()
+graphicsGroup.name = "Graphics"
 
-local graphicsCel = sprite:newCel(
-    graphicsLayer,
-    1,
-    graphicsSprite.cels[1].image,
-    Point(0, 0)
-)
+-- We will select only one graphic layer to be visible
+local hasPrimaryLayer = false
+
+for _, family in ipairs(typeface.families) do
+
+    -- Family group
+    local familyGroup = sprite:newGroup()
+    familyGroup.name = family.name
+    familyGroup.parent = graphicsGroup
+
+
+    for _, design in ipairs(family.designs) do
+
+        -- Design layer
+        local designLayer = sprite:newLayer()
+        local style = font.style[design.style]
+        local isRegular = style == font.style.regular
+
+        designLayer.name = style
+        designLayer.parent = familyGroup
+
+        if not hasPrimaryLayer and isRegular then
+            hasPrimaryLayer = true
+        else
+             designLayer.isVisible = false
+        end
+
+        local graphicsSprite = app.open(design.path)
+        local designCel = sprite:newCel(
+            designLayer,
+            1,
+            graphicsSprite.cels[1].image,
+            Point(0, 0)
+        )
+
+        graphicsSprite:close()
+    end
+end
 
 tableSprite:close()
-graphicsSprite:close()
-
 ------------------------------------------------------------
 -- Save
 ------------------------------------------------------------

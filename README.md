@@ -39,8 +39,8 @@ aseprite --batch "./src/Basic Latin/design.aseprite" \
 https://github.com/behreajj/AsePnmIo
 ```bash
 aseprite --batch \
---script-param readFile="./src/Basic Latin/sheet.aseprite"  \
---script-param writeFile="./src/Basic Latin/glyphs/glyph.pbm" \
+--script-param readFile="./src/Basic Latin/export/Seafront/regular.aseprite"  \
+--script-param writeFile="./src/Basic Latin/glyphs/Seafront/regular/glyph.pbm" \
 --script-param action=EXPORT \
 --script-param writeMode=ASCII \
 --script-param frames=ALL \
@@ -52,7 +52,7 @@ aseprite --batch \
 python export.py --help
 ```
 ```commandline
-usage: export.py [-h] [-v VERBOSE] [-s {base,half,full}] [-a {base,half,full}] [-t {regular,bold,monospace}] [output]
+usage: export.py [-h] [-v VERBOSE] [-i [IDENTIFIER]] [-s {base,half,full}] [-a {base,half,full}] [-t {regular,monospace,bold}] [-c {Seafront,Seafront Square}] [output]
 
 Export a TrueType font from this project
 
@@ -63,10 +63,21 @@ options:
   -h, --help            show this help message and exit
   -v, --verbose VERBOSE
                         log verbose outputs
+  -i, --identifier [IDENTIFIER]
+                        The font's version number to export ex. 1.000
   -s, --scale {base,half,full}
                         The scale preset that affect the font's internal positioning. Default to 'base'
   -a, --accent {base,half,full}
                         The accent preset of this font which define the ascent and descend line of this font, Default to 'base'
-  -t, --typeface {regular,bold,monospace}
-                        Typeface to export configured in config/profile.yml. Default to 'regular'
+  -t, --typeface {regular,monospace,bold}
+                        Typeface to export configured in config/font.yml. Default to 'regular'
+  -c, --family {Seafront,Seafront Square}
+                        The family name to export
 ```
+---
+#### credits
+Simple Yaml Parser dependency free:
+https://github.com/toolcreator/simpleyaml.lua
+
+Export .aseprite file to pbm bitmap:
+https://github.com/behreajj/AsePnmIo

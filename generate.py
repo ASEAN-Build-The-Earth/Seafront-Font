@@ -29,7 +29,7 @@ SCRIPT: str = "scripts/aseprite/create-project.lua"
 ASSETS: Path = ROOT / "assets"
 CONFIG: Path = ROOT / "config"
 PROJECT: Path = CONFIG / "project.yml"
-FONT_32: Path = ASSETS / "BTE-Seafront-Basic-Regular.ttf"
+FONT_16: Path = ASSETS / "BTE-Seafront-Square-Regular.ttf"
 
 def load_project():
     with open(PROJECT, encoding="utf-8") as fp:
@@ -51,7 +51,7 @@ def generate(block_id, block):
         ASSETS / "null-cell-64px.png"
     ).convert("RGBA")
 
-    label_font = ImageFont.truetype(FONT_32, 16)
+    label_font = ImageFont.truetype(FONT_16, 16)
 
     output: Path = ROOT / "src" / block_id
     output.mkdir(exist_ok=True)
@@ -65,11 +65,12 @@ def generate(block_id, block):
         (255, 255, 255, 0),
     )
 
-    graphics = output / "regular.png"
-
-    if not graphics.exists():
-        sheet.save(graphics)
-        print(f"Written Empty {graphics}")
+    # TODO: Adapt to new graphics directory
+    # graphics = output / "regular.png"
+    #
+    # if not graphics.exists():
+    #     sheet.save(graphics)
+    #     print(f"Written Empty {graphics}")
 
     draw = ImageDraw.Draw(sheet)
 
@@ -91,7 +92,7 @@ def generate(block_id, block):
         sheet.alpha_composite(cell, (x, y))
 
         draw.text(
-            (x + 4, y),
+            (x + 5, y - 1),
             f"U+{codepoint:04X}",
             font=label_font,
             fill=(70, 70, 70),
@@ -107,6 +108,7 @@ def generate(block_id, block):
             "aseprite",
             "--batch",
             "--script-param", f"dir={output}",
+            "--script-param", f"config={CONFIG}",
             "--script", SCRIPT,
         ], check=True)
     except subprocess.CalledProcessError:
