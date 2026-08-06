@@ -159,17 +159,27 @@ def build_glyph(pbm: Path,
     # This 2 metrics determined how glyph is displayed relative to its "advance" width
     # The "lsb" is the starting point of the glyph's minimum point
 
-    start_padding = 0
+    start_padding = origin_x - min_x
     advance_width = max_x - origin_x + 1
 
     # Only monospace will need special care to ensure every glyph has same width
     if profile["typeface"] == "monospace":
         # The left-over space if some character is smaller than monospace width
+        # We assume the padding is equal left and right for it to be place on the center
         advance_width = profile["typography"]["monospace-width"]
-        start_padding = advance_width - glyph_width
+        start_padding = (advance_width - glyph_width) / 2
 
-    lsb = (origin_x - min_x + start_padding) * pixel_size
-    advance = (advance_width + right_padding) * pixel_size
+        if v: # Verbose logging in case a glyph is not centered by default
+            position = (origin_x + advance_width) - (max_x + 1)
+            if position != start_padding:
+                log(v, f"{'\033[93m'}Monospace glyph "
+                      f"for U+{codepoint:04X} is not centered: "
+                      f"\nPadding is expected to span the width equally"
+                      f"\n\tExpected: {start_padding} + {start_padding}"
+                      f"\n\tGot: {position} + {(advance_width - position - glyph_width)}{'\033[0m'}")
+
+    lsb: int = int( start_padding * pixel_size )
+    advance: int = (advance_width + right_padding) * pixel_size
     log(v, f"U+{codepoint:04X}"
         f" bounds=({min_x},{min_y})-({max_x},{max_y}),"
         f" size={glyph_width}x{glyph_height},"
