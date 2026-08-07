@@ -2,7 +2,6 @@
 
 A pixelated style typeface developed by the BuildTheEarth Community.
 
-## Fonts Preview
 ![BTE-Seafront-Preview](https://github.com/ASEAN-Build-The-Earth/Seafront-Font/blob/main/assets/BTE-Seafront-Preview.png)
 
 ## Developer Corner
