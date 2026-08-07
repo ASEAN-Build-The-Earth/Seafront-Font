@@ -2,6 +2,9 @@
 
 A pixelated style typeface developed by the BuildTheEarth Community.
 
+## Fonts Preview
+![BTE-Seafront-Preview](https://github.com/ASEAN-Build-The-Earth/Seafront-Font/blob/main/assets/BTE-Seafront-Preview.png)
+
 ## Developer Corner
 
 For devs
@@ -75,7 +78,7 @@ options:
                         The family name to export
 ```
 ---
-#### credits
+#### Credits
 Simple Yaml Parser dependency free:
 https://github.com/toolcreator/simpleyaml.lua
 
