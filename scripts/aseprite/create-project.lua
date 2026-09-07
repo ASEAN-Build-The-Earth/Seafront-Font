@@ -15,6 +15,7 @@ https://openfontlicense.org
 ------------------------------------------------------------
 
 local dir = app.params["dir"]
+local ext = app.params["ext"]
 local config = app.params["config"]
 
 if not dir then
@@ -24,9 +25,11 @@ if not config then
     error("Missing script parameter: config")
 end
 
-local fontTablePath = dir .. "/font-table.png"
+local is_extension = ext and (ext == "True" and true or false) or false
+local extParentPath = is_extension and "/ext-" or "/"
+local fontTablePath = dir .. extParentPath .. "font-table.png"
+local outputPath = dir .. extParentPath .. "design.aseprite"
 local designPath = dir .. "/design/"
-local outputPath = dir .. "/design.aseprite"
 local configPath = config .. "/font.yml"
 
 simpleyaml = require("simpleyaml")
@@ -70,13 +73,18 @@ function loadDesign(folder)
             for _, path in ipairs(app.fs.listFiles(directory)) do
                 if path:lower():match("%.png$") then
                     local filename = app.fs.fileName(path)
-                    local style = filename:gsub("%.png$", "")
+                    local style = not is_extension
+                        and filename:gsub("%.png$", "")
+                        or filename:match("ext%-(.+)%.png$")
+                    local checked = is_extension and true or not style:match("^ext%-")
 
-                    print("Found: " .. style .. " For " .. familyName)
-                    table.insert(family.designs, {
-                        style = style,
-                        path = app.fs.joinPath(directory, path)
-                    })
+                    if style and checked then
+                        print("Found: " .. style .. " For " .. filename)
+                         table.insert(family.designs, {
+                            style = style,
+                            path = app.fs.joinPath(directory, path)
+                        })
+                    end
                 end
             end
         end
@@ -129,7 +137,7 @@ for _, family in ipairs(typeface.families) do
         local style = font.style[design.style]
         local isRegular = style == font.style.regular
 
-        designLayer.name = style
+        designLayer.name = not style and design.style or style
         designLayer.parent = familyGroup
 
         if not hasPrimaryLayer and isRegular then

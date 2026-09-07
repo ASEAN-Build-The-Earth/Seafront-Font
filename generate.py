@@ -31,84 +31,51 @@ CONFIG: Path = ROOT / "config"
 PROJECT: Path = CONFIG / "project.yml"
 FONT_16: Path = ASSETS / "BTE-Seafront-Square-Regular.ttf"
 
-def load_project():
-    with open(PROJECT, encoding="utf-8") as fp:
+def load_yaml(file):
+    with open(file, encoding="utf-8") as fp:
         return yaml.safe_load(fp)
 
+def generate_font_table(fn,
+                        cells_count: int,
+                        column_size: int,
+                        cells_label):
 
-def generate(block_id, block):
-    start = block["start"]
-    end = block["end"]
-
-    count = end - start + 1
-    rows = (count + COLUMN_SIZE - 1) // COLUMN_SIZE
-
-    font_cell = Image.open(
-        ASSETS / "font-cell-64px.png"
-    ).convert("RGBA")
-
-    null_cell = Image.open(
-        ASSETS / "null-cell-64px.png"
-    ).convert("RGBA")
-
-    label_font = ImageFont.truetype(FONT_16, 16)
-
-    output: Path = ROOT / "src" / block_id
-    output.mkdir(exist_ok=True)
-
+    row_size = (cells_count + column_size - 1) // column_size
     sheet = Image.new(
         "RGBA",
-        (
-            COLUMN_SIZE * CELL_SIZE,
-            rows * CELL_SIZE,
-        ),
+        (column_size * CELL_SIZE, row_size * CELL_SIZE),
         (255, 255, 255, 0),
     )
-
-    # TODO: Adapt to new graphics directory
-    # graphics = output / "regular.png"
-    #
-    # if not graphics.exists():
-    #     sheet.save(graphics)
-    #     print(f"Written Empty {graphics}")
-
     draw = ImageDraw.Draw(sheet)
 
-    for i in range(count):
-
-        codepoint = start + i
-
-        row = i // COLUMN_SIZE
-        col = i % COLUMN_SIZE
+    for i in range(cells_count):
+        row = i // column_size
+        col = i % column_size
 
         x = col * CELL_SIZE
         y = row * CELL_SIZE
 
-        if codepoint < 0x20 or 0x7F <= codepoint <= 0x9F:
-            cell = null_cell
-        else:
-            cell = font_cell
-
+        (label, cell) = fn(i)
         sheet.alpha_composite(cell, (x, y))
 
         draw.text(
             (x + 5, y - 1),
-            f"U+{codepoint:04X}",
-            font=label_font,
+            label,
+            font=cells_label,
             fill=(70, 70, 70),
         )
 
-    table = output / "font-table.png"
-    exist = "Overwritten" if table.exists() else "Generated"
-    sheet.save(table)
-    print(f"{exist} {table}")
+    return sheet
 
+def generate_aseprite_project(output: Path,
+                              is_extension: bool):
     try:
         subprocess.run([
             "aseprite",
             "--batch",
             "--script-param", f"dir={output}",
             "--script-param", f"config={CONFIG}",
+            "--script-param", f"ext={is_extension}",
             "--script", SCRIPT,
         ], check=True)
     except subprocess.CalledProcessError:
@@ -118,9 +85,63 @@ def generate(block_id, block):
         print(f"Aseprite not found in system. Cannot generate project file.")
         pass  # executable not found
 
+def generate(block_id, block):
+    font_cell = Image.open(ASSETS / "font-cell-64px.png").convert("RGBA")
+    null_cell = Image.open(ASSETS / "null-cell-64px.png").convert("RGBA")
+    label_font = ImageFont.truetype(FONT_16, 16)
+
+    output: Path = ROOT / "src" / block_id
+    output.mkdir(exist_ok=True)
+
+    start = block["start"]
+    end = block["end"]
+
+    count = end - start + 1
+    has_graphic = lambda char: char.isprintable() and not char.isspace()
+    fn = lambda i: (
+        f"U+{(start + i):04X}",
+        font_cell if has_graphic(chr(start + i)) else null_cell
+    )
+
+    sheet = generate_font_table(fn, count, COLUMN_SIZE, label_font)
+
+    # TODO: Adapt to new graphics directory
+    # graphics = output / "regular.png"
+    #
+    # if not graphics.exists():
+    #     sheet.save(graphics)
+    #     print(f"Written Empty {graphics}")
+
+    table = output / "font-table.png"
+    exist = "Overwritten" if table.exists() else "Generated"
+    sheet.save(table)
+    print(f"{exist} {table}")
+
+    generate_aseprite_project(output, False)
+
+    extension: Path = output / "feature" / "glyphs.yml"
+    if extension.exists():
+        glyphs_yml = load_yaml(extension)
+        columns = glyphs_yml["column"]
+        glyphs = glyphs_yml["glyphs"]
+        fn = lambda i: (
+            f"ext-{i:02X}",
+            font_cell if glyphs[f"ext-{i:02X}"]["name"] else null_cell
+        )
+
+        print(f"{len(glyphs)} glyphs Extension feature found for {block_id} unicode range")
+
+        sheet = generate_font_table(fn, len(glyphs), columns, label_font)
+        table = output / "ext-font-table.png"
+        exist = "Overwritten" if table.exists() else "Generated"
+        sheet.save(table)
+        print(f"{exist} Extension {table}")
+
+        generate_aseprite_project(output, True)
+
 def main():
     unicode_blocks = load_unicode_blocks()
-    project = load_project()
+    project = load_yaml(PROJECT)
 
     parser = argparse.ArgumentParser()
 

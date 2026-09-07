@@ -16,7 +16,7 @@ typeface:
     # But its barely used anymore. We will use "BTE" as the our font identifying prefix.
     # ========================
     foundry-name: "BTE"
-    version: "Version 1.000"
+    version: "Version 1.200"
     designer: > 
       Lead designer: chr7s-c, tin. 
       With contributions from the BuildTheEarth Community.
@@ -49,6 +49,8 @@ profile:
     right-padding: 3
     italic-angle: -12
     monospace-width: 16
+    above-anchor: 6
+    below-anchor: -6
   # ========================
   # Unit scaling
   # Doesn't affect visually, but internally how each pixel is mapped on a font coordinate

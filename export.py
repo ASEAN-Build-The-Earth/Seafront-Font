@@ -52,11 +52,11 @@ def draw_glyphs(verbose: bool, pen: TTGlyphPen, paths: list[list[Edge]]):
     :param paths: Path list to render
     """
     def draw_glyph(path: list[Edge]):
-        log(verbose, f"Starting {path[0][0]}")
+        # log(verbose, f"Starting {path[0][0]}")
         pen.moveTo(path[0][0])
 
         for edge in path:
-            log(verbose, f"Drawing {edge[1]}")
+            # log(verbose, f"Drawing {edge[1]}")
             pen.lineTo(edge[1])
 
         pen.closePath()
@@ -129,10 +129,17 @@ def build_glyph(pbm: Path,
             f"Expected {pbm_cell}*{pbm_cell}, Got {w}*{h} at:\n'{pbm}'"
         )
 
-    # Special case for space character (U+0020)
-    if codepoint == 32:
-        glyph_name = f"uni{codepoint:04X}"
+    # Glyph's identity
+    # Standard uni0000 (:04X) Unicode glyph naming
+    glyph_name = f"uni{codepoint:04X}"
+    is_extension = False
 
+    # Check for codepoint identity
+    if "define_name" in profile:
+        is_extension = True
+        glyph_name = profile["define_name"]
+    # Special case for space character (U+0020)
+    elif codepoint == 0x0020:
         log(v, f"Writing whitespace U+{codepoint:04X} as {white_space}px")
         pen = TTGlyphPen(None)
 
@@ -142,9 +149,46 @@ def build_glyph(pbm: Path,
         glyph["cmap"][codepoint] = glyph_name
         return 1
 
+    # Glyph's positional profile
+    y_anchor = 0
+    x_anchor = 0
+    # above_anchor: int = profile["typography"]["white-space"]
+    # below_anchor: int = profile["typography"]["right-padding"]
+
+    if profile["anchors_yml"].exists():
+        anchors_yml = load_yaml(profile["anchors_yml"])
+        options = dict(ABOVE="above-anchor", BELOW="below-anchor")
+
+        # If this glyph has anchor configuration
+        if glyph_name in anchors_yml:
+            anchor: str | dict = anchors_yml[glyph_name]
+
+            # Typography y anchor profile
+            if isinstance(anchor, str):
+                anchor_profile = options[anchor] if (
+                    anchor in options
+                ) else None
+            elif isinstance(anchor, dict):
+                anchor_profile = options[anchor["anchor"]] if (
+                    "anchor" in anchor and anchor["anchor"] in options
+                ) else None
+            else:
+                anchor_profile = None
+
+            if anchor_profile:
+                y_anchor += profile["typography"][anchor_profile]
+            if "x" in anchor:
+                x_anchor += int( anchor["x"] )
+            if "y" in anchor:
+                y_anchor += int( anchor["y"] )
+
+    if profile["kerning_yml"].exists():
+        kerning_yml = load_yaml(profile["kerning_yml"])
+        # TODO: kernings
+
     pixels = image.load()
     fn = lambda x, y: pixels[x, y] if pixels is not None else 1
-    boundary = extract(fn, w, h, origin_x, origin_y, pixel_size)
+    boundary = extract(fn, w, h, origin_x , origin_y + y_anchor, pixel_size)
 
     if boundary is None:
         print(f"{'\033[93m'}Glyph for U+{codepoint:04X} is empty{'\033[0m'}", file=sys.stderr)
@@ -159,7 +203,7 @@ def build_glyph(pbm: Path,
     # This 2 metrics determined how glyph is displayed relative to its "advance" width
     # The "lsb" is the starting point of the glyph's minimum point
 
-    start_padding = origin_x - min_x
+    start_padding = origin_x - min_x + x_anchor
     advance_width = max_x - origin_x + 1
 
     # Only monospace will need special care to ensure every glyph has same width
@@ -190,12 +234,21 @@ def build_glyph(pbm: Path,
     paths = chain(edges)
     draw_glyphs(v, pen, paths)
 
-    glyph_name = f"uni{codepoint:04X}"
-
-    glyph["glyph_order"].append(glyph_name)
     glyph["glyphs"][glyph_name] = pen.glyph()
     glyph["metrics"][glyph_name] = (advance, lsb)
-    glyph["cmap"][codepoint] = glyph_name
+    if is_extension:
+        unicode_name = glyph_name.split('.')[0]
+        try:
+            # Insert extensions to their Unicode counterpart so the order looks pretty
+            # For example: uni0E4B, uni0E4B.narrow, uni0E4B.small, uni0E4C, ...
+            target_index = glyph["glyph_order"].index(unicode_name)
+            glyph["glyph_order"].insert(target_index + 1, glyph_name)
+        except ValueError:
+            glyph["glyph_order"].append(glyph_name)
+    else:
+        glyph["cmap"][codepoint] = glyph_name
+        glyph["glyph_order"].append(glyph_name)
+
     return 1
 
 def export(typeface, profile, output):
@@ -224,25 +277,67 @@ def export(typeface, profile, output):
         for block_id in project["blocks"]:
             face = typeface["face"]
             glyph_dir: Path = to_glyphs_dir(block_id, family_name, face)
+            anchors_yml: Path = ROOT / "src" / block_id / "feature" / "anchors.yml"
+            kerning_yml: Path = ROOT / "src" / block_id / "feature" / "kerning.yml"
 
             if not glyph_dir.exists():
-                raise ValueError(
+                error = (
                     f"Glyphs for '{block_id}' with style '{face}' referenced in project.yml "
                     f"does not exist for exporting at: \n'{glyph_dir}'"
                 )
+                print(f"{'\033[93m'}{error}{'\033[0m'}", file=sys.stderr)
+                continue
 
+            # Add all Unicode Glyphs
             for pbm in sorted(glyph_dir.glob("glyph_*.pbm")):
                 index = int(pbm.stem.split("_")[1])
                 codepoint = int(blocks[block_id]["start"]) + (index - 1)
                 glyph_profile: dict = {
                     "codepoint": codepoint,
                     "pixel_size": pixel_size,
+                    "anchors_yml": anchors_yml,
+                    "kerning_yml": kerning_yml,
                     "verbose": v,
                     "typeface": face,
                     "typography": profile["typography"]
                 }
-                log(v, f"Building Glyph index: {index} (U+{codepoint:04X})")
+                log(v, f"Building Glyph index: {index} ({codepoint}: U+{codepoint:04X})")
                 built += build_glyph(pbm, glyph, glyph_profile, profile["accent"])
+
+            # Check if extra features exist as glyphs config
+            feat_glyphs: Path = ROOT / "src" / block_id / "feature" / "glyphs.yml"
+
+            if feat_glyphs.exists():
+                ext_glyph_yml = load_yaml(feat_glyphs)
+                ext_glyph_dir = to_glyphs_dir(block_id, family_name, f"ext-{face}")
+                if not ext_glyph_dir.exists():
+                    error = (
+                        f"Extra glyphs features for '{block_id}' with style '{face}' referenced in feature/glyphs.yml "
+                        f"does not exist for exporting at: \n'{ext_glyph_dir}'"
+                    )
+                    print(f"{'\033[93m'}{error}{'\033[0m'}", file=sys.stderr)
+                    continue
+
+                define_name = lambda i: ext_glyph_yml["glyphs"][f"ext-{i:02X}"]["name"]
+                anchors_yml: Path = ROOT / "src" / block_id / "feature" / "anchors.yml"
+                kerning_yml: Path = ROOT / "src" / block_id / "feature" / "kerning.yml"
+
+                # Add all Extra glyphs
+                for pbm in sorted(ext_glyph_dir.glob("glyph_*.pbm")):
+                    index = int(pbm.stem.split("_")[1]) - 1
+                    glyph_profile: dict = {
+                        "codepoint": index,
+                        "define_name": define_name(index),
+                        "anchors_yml": anchors_yml,
+                        "kerning_yml": kerning_yml,
+                        "pixel_size": pixel_size,
+                        "verbose": v,
+                        "typeface": face,
+                        "typography": profile["typography"]
+                    }
+
+                    log(v, f"Building Extra Glyph: {index} (EXT-{index:02X})")
+                    built += build_glyph(pbm, glyph, glyph_profile, profile["accent"])
     except Exception as e:
         print(f"{'\033[93m'}{e}{'\033[0m'}", file=sys.stderr)
     if built == 0:
@@ -288,7 +383,7 @@ def export(typeface, profile, output):
     info: dict[str, str] = typeface["info"]
     license_desc: list[str] = LICENSE.splitlines()
     license_info: str = license_desc[len(license_desc) - 1]
-    strings_list: list[str] = [info["foundry-name"], family_name]
+    strings_list: list[str] = [info["foundry-name"], family_name, "Thai"]
     family_name = ' '.join(strings_list) # BTE Seafront
 
     strings_list.append(typeface["style"])
@@ -317,11 +412,19 @@ def export(typeface, profile, output):
         "licenseDescription": LICENSE, # (nameID 13)
         "licenseInfoURL": license_info, # (nameID 14)
         # (nameID 15 reserved)
-        "typographicFamily": info["family"], # (nameID 16)
+        "typographicFamily": info["family"] + " Thai", # (nameID 16)
         "typographicSubfamily": typeface["style"], # (nameID 17)
         "compatibleFullName": full_name, # (nameID 18)
         "sampleText": info["sample-text"], # (nameID 19)
     }
+
+    # 2. Define the path to your .fea file
+    fea_path = ROOT / "src" / "Thai" / "feature" / "features.fea"
+    features = Path(fea_path).read_text()
+
+    # 3. Compile and embed the features into the font object
+    # This modifies the font object in-place
+    fb.addOpenTypeFeatures(features)
 
     fb.setupNameTable(name_strings)
 
@@ -337,6 +440,7 @@ def export(typeface, profile, output):
         maxMemType1=0,
     )
     log(v, "Written Metadata: ", name_strings)
+    log(v, "Glyphs Metadata: ", glyph["glyph_order"])
     filename = f"{postscript}.ttf" if output is None else \
         (output if str(output).endswith(".ttf") else f"{output}.ttf")
     fb.save(filename)

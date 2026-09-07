@@ -23,6 +23,8 @@ end
 local configPath = config .. "/font.yml"
 local dir = app.fs.filePath(app.sprite.filename)
 local designPath = app.fs.joinPath(dir, "design")
+local app_filename = app.fs.fileName(app.sprite.filename)
+local is_extension = app_filename:match("^ext%-(.+)%.aseprite$") and true or false
 
 simpleyaml = require("simpleyaml")
 graphics = require("graphics")
@@ -51,7 +53,8 @@ for _, family in ipairs(font.family) do
 				local sourceImage = cel.image
 				local imageX = cel.position.x
 				local imageY = cel.position.y
-				local path = app.fs.joinPath(out, style .. ".png")
+				local name = is_extension and ("ext-" .. style) or style
+				local path = app.fs.joinPath(out, name .. ".png")
 				local image = Image(source.width, source.height, source.colorMode)
 
 				image:drawImage(sourceImage, Point(imageX, imageY))
