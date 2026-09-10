@@ -1,0 +1,213 @@
+# ========================
+# Glyph Positioning
+# ========================
+# anchor:
+#   type: BASE/ABOVE/BELOW Anchor positioning class
+#   mark:
+#     mkmk: Mark-To-Mark anchor
+#     base: Base-To-Mark anchor
+#   base:
+#     above: Above marks anchor
+#     below: below marks anchor
+# pos:
+#   x: Move glyph horizontally in pixels
+#   y: Move glyph vertically in pixels
+# ========================
+#
+# Anchor type (classes):
+#
+# ABOVE:
+#   Mark glyph positioned above a base glyph.
+#   Glyph has zero advance width and is positioned at
+#   the left-hand side of the typing cursor.
+#
+#   defaults at: font.yml/profile.typography.above-marks
+# BELOW:
+#   Mark glyph positioned below a base glyph.
+#   Glyph has zero advance width and is positioned at
+#   the left-hand side of the typing cursor.
+#
+#   defaults at: font.yml/profile.typography.below-marks
+# BASE:
+#   Base glyph providing an attachment point.
+#   Anchor is positioned relative to the glyph boundary.
+#
+#   default anchors are place at bottom right and top right of the glyph boundary
+
+
+# ========================
+# Thai-script Bases
+# ========================
+uni0E01: BASE
+uni0E02: BASE
+uni0E03: BASE
+uni0E04: BASE
+uni0E05: BASE
+uni0E06: BASE
+uni0E07: BASE
+uni0E08: BASE
+uni0E09: BASE
+uni0E0A:
+  anchor:
+    type: BASE
+    base:
+      above: [-6, 0]
+uni0E0B:
+  anchor:
+    type: BASE
+    base:
+      above: [ -6, 0 ]
+uni0E0C: BASE
+uni0E0D: BASE
+uni0E0D.less: BASE
+uni0E0E: BASE
+uni0E0E.short: BASE
+uni0E0F: BASE
+uni0E0F.short: BASE
+uni0E10: BASE
+uni0E10.less: BASE
+uni0E11: BASE
+uni0E12: BASE
+uni0E13: BASE
+uni0E14: BASE
+uni0E15: BASE
+uni0E16: BASE
+uni0E17: BASE
+uni0E18: BASE
+uni0E19: BASE
+uni0E1A: BASE
+uni0E1B:
+  anchor:
+    type: BASE
+    base:
+      above: [ -6, 0 ]
+uni0E1C: BASE
+uni0E1D:
+  anchor:
+    type: BASE
+    base:
+      above: [ -6, 0 ]
+uni0E1E: BASE
+uni0E1F:
+  anchor:
+    type: BASE
+    base:
+      above: [ -6, 0 ]
+uni0E20: BASE
+uni0E21: BASE
+uni0E22: BASE
+uni0E23: BASE
+uni0E24: BASE
+uni0E24.short: BASE
+uni0E25: BASE
+uni0E26: BASE
+uni0E26.short: BASE
+uni0E27: BASE
+uni0E28:
+  anchor:
+    type: BASE
+    base:
+      above: [ -6, 0 ]
+uni0E29: BASE
+uni0E2A:
+  anchor:
+    type: BASE
+    base:
+      above: [ -6, 0 ]
+uni0E2B: BASE
+uni0E2C: BASE
+uni0E2C.short: BASE
+uni0E2D: BASE
+uni0E2E:
+  anchor:
+    type: BASE
+    base:
+      above: [ -6, 0 ]
+# ========================
+# Thai-script Marks
+# ========================
+uni0E31:
+  anchor: ABOVE
+  pos:
+    x: 6
+uni0E34:
+  anchor:
+    type: ABOVE
+    mark:
+      base: [0, 0]
+      mkmk: [0, -2]
+uni0E35: ABOVE
+uni0E36: ABOVE
+uni0E37: ABOVE
+uni0E47: ABOVE
+uni0E48: ABOVE
+uni0E49: ABOVE
+uni0E4A: ABOVE
+uni0E4B: ABOVE
+uni0E4C: ABOVE
+uni0E4D: ABOVE
+uni0E4E: ABOVE
+# Thai below marks
+uni0E38: BELOW
+uni0E39:
+  anchor:
+    type: BELOW
+    mark:
+      mkmk: [0, 0]
+      base: [0, 0]
+uni0E3A:
+  anchor:
+    type: BELOW
+    mark:
+      base: [0, 0]
+      mkmk: [0, 2]
+# Thai Extension  marks
+uni0E31.narrow:
+  anchor:
+    type: ABOVE
+    mark:
+      mkmk: [0, 0]
+      base: [0, 0]
+    base:
+      above: [0, 0]
+      below: [0, 0]
+uni0E48.small:
+  anchor: ABOVE
+uni0E48.narrow:
+  anchor: ABOVE
+uni0E49.small:
+  anchor: ABOVE
+uni0E49.narrow:
+  anchor: ABOVE
+uni0E4A.small:
+  anchor: ABOVE
+uni0E4A.narrow:
+  anchor: ABOVE
+uni0E4B.small:
+  anchor: ABOVE
+uni0E4B.narrow:
+  anchor: ABOVE
+uni0E4C.small:
+  anchor: ABOVE
+uni0E4C.narrow:
+  anchor: ABOVE
+uni0E47.small:
+  anchor: ABOVE
+uni0E47.narrow:
+  anchor: ABOVE
+uni0E34.narrow:
+  anchor: ABOVE
+uni0E35.narrow:
+  anchor: ABOVE
+uni0E36.narrow:
+  anchor: ABOVE
+uni0E37.narrow:
+  anchor: ABOVE
+uni0E4D.narrow:
+  anchor: ABOVE
+uni0E3A.small:
+  anchor: BELOW
+uni0E38.small:
+  anchor: BELOW
+uni0E39.small:
+  anchor: BELOW

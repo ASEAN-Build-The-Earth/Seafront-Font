@@ -1,4 +1,29 @@
 # ========================
+# Available Fonts
+# ========================
+font:
+  # BTE Seafront
+  seafront:
+    font-desc-name: ~
+    font-desc-info: "The standard Seafront font"
+    unicode-blocks:
+      - "Basic Latin"
+    features-afdko:
+      parent-afdko: "features/seafront.fea"
+      includes-fea:
+        - "features/seafront/features.fea"
+  # BTE Seafront Thai
+  seafront-thai:
+    font-desc-name: "Thai"
+    font-desc-info: "The Thai-script support of Seafront"
+    unicode-blocks:
+      - "Basic Latin"
+      - "Thai"
+    features-afdko:
+      parent-afdko: "features/seafront-thai.fea"
+      includes-fea:
+        - "features/seafront-thai/features.fea"
+# ========================
 # Typeface Metadata
 # ========================
 typeface:
@@ -49,8 +74,17 @@ profile:
     right-padding: 3
     italic-angle: -12
     monospace-width: 16
-    above-anchor: 6
-    below-anchor: -6
+    # Default anchoring positions
+    anchors:
+      base:
+        above: 4
+        below: -4
+      mark:
+        above: 6
+        below: -6
+      mkmk:
+        above: 8
+        below: -8
   # ========================
   # Unit scaling
   # Doesn't affect visually, but internally how each pixel is mapped on a font coordinate

@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parent
 
 SCRIPT: str = "scripts/aseprite/create-project.lua"
 ASSETS: Path = ROOT / "assets"
-CONFIG: Path = ROOT / "config"
+CONFIG: Path = ROOT / "font"
 PROJECT: Path = CONFIG / "project.yml"
 FONT_16: Path = ASSETS / "BTE-Seafront-Square-Regular.ttf"
 
@@ -119,7 +119,7 @@ def generate(block_id, block):
 
     generate_aseprite_project(output, False)
 
-    extension: Path = output / "feature" / "glyphs.yml"
+    extension: Path = output / "profile" / "glyphs.yml"
     if extension.exists():
         glyphs_yml = load_yaml(extension)
         columns = glyphs_yml["column"]
