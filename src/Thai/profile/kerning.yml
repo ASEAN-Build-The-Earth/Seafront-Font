@@ -1,0 +1,121 @@
+groups:
+  zero-thai.left:
+    - uni0E50 # zero-thai
+    - uni0E51 # one-thai
+  zero-thai.right:
+    - uni0E50 # zero-thai
+    - uni0E51 # one-thai
+  four-thai.left:
+    - uni0E54 # four-thai
+    - uni0E55 # five-thai
+  four-thai.right:
+    - uni0E54 # four-thai
+    - uni0E55 # five-thai
+  eight-thai:
+    - uni0E58
+  six-thai:
+    - uni0E56
+  # hyphen.left:
+  #   - hyphen # hyphen
+  # hyphen.right:
+  #   - hyphen # hyphen
+  saraE-thai:
+    - uni0E40 # saraE-thai
+    - uni0E41 # saraAe-thai
+    - uni0E44 # saraAiMaimalai-thai
+    - uni0E43 # saraAiMaimuan-thai
+    - uni0E42 # saraO-thai
+  boBaimai-thai:
+    - uni0E09 # choChing-thai
+    - uni0E1A # boBaimai-thai
+    - uni0E1B # poPla-thai
+    - uni0E29 # soRusi-thai
+  choChan-thai:
+    - uni0E08 # choChan-thai
+    - uni0E10 # thoThan-thai
+    - uni0E10.less # thoThan-thai.less
+  doDek-thai:
+    - uni0E14 # doDek-thai
+    - uni0E15 # toTao-thai
+    - uni0E12 # thoPhuthao-thai
+  khoKhai-thai:
+    - uni0E02 # khoKhai-thai
+    - uni0E03 # khoKhuat-thai
+    - uni0E0A # choChang-thai
+    - uni0E0B # soSo-thai
+  khoKhwai-thai:
+    - uni0E04 # khoKhwai-thai
+    - uni0E05 # khoKhon-thai
+    - uni0E28 # soSala-thai
+  khoRakhang-thai:
+    - uni0E11 # thoNangmontho-thai
+    - uni0E06 # khoRakhang-thai
+  loLing-thai:
+    - uni0E25 # loLing-thai
+    - uni0E2A # soSua-thai
+  noNu-thai:
+    - uni0E19 # noNu-thai
+  ngoNgu-thai:
+    - uni0E07
+  oAng-thai:
+    - uni0E2D # oAng-thai
+    - uni0E2E # hoNokhuk-thai
+  phoPhan-thai:
+    - uni0E1F # foFan-thai
+    - uni0E1E # phoPhan-thai
+    - uni0E2C # loChula-thai
+    - uni0E2C.short # loChula-thai.short
+  phoSamphao-thai:
+    - uni0E20 # phoSamphao-thai
+    - uni0E26 # lu-thai
+    - uni0E26.short # lu-thai.short
+    - uni0E0E # doChada-thai
+    - uni0E0E.short # doChada-thai.short
+    - uni0E0F # toPatak-thai
+    - uni0E0F.short # toPatak-thai.short
+    - uni0E26.uni0E45 # lu_lakkhangyao-thai
+  roRua-thai:
+    - uni0E23
+  thoThong-thai:
+    - uni0E18
+  thoThung-thai:
+    - uni0E16 # thoThung-thai
+    - uni0E24 # ru-thai
+    - uni0E24.short # ru-thai.short
+    - uni0E24.uni0E45 # ru_lakkhangyao-thai
+    - uni0E0D # yoYing-thai
+    - uni0E0D.less # yoYing-thai.less
+    - uni0E0C # choChoe-thai
+    - uni0E13 # noNen-thai
+  woWaen-thai:
+    - uni0E27
+  yoYak-thai:
+    - uni0E22
+kerning:
+  # uni0E59: # nine-thai
+  #   eight-thai: 4
+  #   four-thai.right: 4
+  #   zero-thai.right: 4
+  #   six-thai: -4
+  # uni0E54: # four-thai.left
+  #   eight-thai: 2
+  #   zero-thai.right: 2
+  uni0E40: # saraE-thai
+    # ngoNgu-thai: 4
+    boBaimai-thai: -2
+    choChan-thai: -2
+    # doDek-thai: 2
+    khoKhai-thai: -2
+    # khoKhwai-thai: 2
+    # khoRakhang-thai: 2
+    # loLing-thai: 2
+    noNu-thai: -2
+    # oAng-thai: 4
+    phoPhan-thai: -2
+    thoThung-thai: -2
+    roRua-thai: -2
+    thoThong-thai: -2
+    woWaen-thai: -2
+    # yoYak-thai: 4
+  uni0E50: # zero-thai.left
+    six-thai: -2
