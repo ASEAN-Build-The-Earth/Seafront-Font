@@ -1,0 +1,98 @@
+column: 16
+glyphs:
+  ext-00: # YO YING less descent
+    name: "uni0E0D.less"
+  ext-01: # DO CHADA short descent
+    name: "uni0E0E.short"
+  ext-02: # TO PATAK short descent
+    name: "uni0E0F.short"
+  ext-03: # THO THAN less descent
+    name: "uni0E10.less"
+  ext-04: # LO CHULA short ascent
+    name: "uni0E2C.short"
+  ext-05: # RU short descent
+    name: "uni0E24.short"
+  ext-06: # LU short descent
+    name: "uni0E26.short"
+  ext-07: # RU + LAKKHANGYAO combination
+    name: "uni0E24.uni0E45"
+  ext-08: # LU + LAKKHANGYAO combination
+    name: "uni0E26.uni0E45"
+  ext-09:
+    name:
+  ext-0A:
+    name:
+  ext-0B:
+    name:
+  ext-0C:
+    name:
+  ext-0D:
+    name:
+  ext-0E:
+    name:
+  ext-0F:
+    name:
+  ext-10:
+    name:
+  ext-11:
+    name:
+  ext-12:
+    name:
+  ext-13:
+    name:
+  ext-14:
+    name:
+  ext-15:
+    name:
+  ext-16:
+    name:
+  ext-17:
+    name:
+  ext-18:
+    name:
+  ext-19:
+    name:
+  ext-1A: # Special fongman-fannu alternative
+    name: "uni0E4F.alt"
+  ext-1B: # MAI HAN-AKAT narrow
+    name: "uni0E31.narrow"
+  ext-1C: # MAI EK small
+    name: "uni0E48.small"
+  ext-1D: # MAI EK narrow
+    name: "uni0E48.narrow"
+  ext-1E: # MAI THO small
+    name: "uni0E49.small"
+  ext-1F: # MAI THO narrow
+    name: "uni0E49.narrow"
+  ext-20: # MAI TRI small
+    name: "uni0E4A.small"
+  ext-21: # MAI TRI narrow
+    name: "uni0E4A.narrow"
+  ext-22: # MAI CHATTAWA small
+    name: "uni0E4B.small"
+  ext-23: # MAI CHATTAWA narrow
+    name: "uni0E4B.narrow"
+  ext-24: # THANTHAKAT small
+    name: "uni0E4C.small"
+  ext-25: # THANTHAKAT narrow
+    name: "uni0E4C.narrow"
+  ext-26: # MAITAIKHU narrow
+    name: "uni0E47.small"
+  ext-27: # MAITAIKHU small
+    name: "uni0E47.narrow"
+  ext-28: # SARA I
+    name: "uni0E34.narrow"
+  ext-29: # SARA II
+    name: "uni0E35.narrow"
+  ext-2A: # SARA UE
+    name: "uni0E36.narrow"
+  ext-2B: # SARA UEE
+    name: "uni0E37.narrow"
+  ext-2C: # NIKHAHIT
+    name: "uni0E4D.narrow"
+  ext-2D: # PHINTHU
+    name: "uni0E3A.small"
+  ext-2E: # SARA U
+    name: "uni0E38.small"
+  ext-2F: # SARA UU
+    name: "uni0E39.small"
