@@ -20,31 +20,31 @@ using python::
 
     python export_seafront.py
 """
-
+from importlib.resources import as_file
+from seafront.font import FONT_DIR
 from seafront.core.export import export
 
 import seafront.font as font
 import argparse
 import yaml
 
-def log(verbose=False, *args):
-    if verbose:
-        print(*args)
-
 
 def main():
     with font.font_yml().open(encoding="utf-8") as io:
         config = yaml.safe_load(io)
 
-    parser = argparse.ArgumentParser(description='Export a TrueType font from this project')
+    parser = argparse.ArgumentParser(
+        description="Export a TrueType font from this project",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
 
-    accent_options = [*config["profile"]["accent"]]
     typeface_options = [*config["typeface"]["style"]]
+    accent_options = [*config["profile"]["accent"]]
     family_options = config["typeface"]["family"]
 
     parser.add_argument('-v', "--verbose",
-        default=False,
-        type=bool,
+        default=False, const=True,
+        type=bool, nargs="?",
         help="log verbose outputs",
     )
 
@@ -83,11 +83,18 @@ def main():
         help="The family name to export",
     )
 
-    parser.add_argument(
-        "output",
-        nargs="?",
-        help="Output file name *.ttf, default to the psName of exporting typeface.",
-    )
+    # Positional Arguments
+    #  export.py {font_options} {output_filename}
+
+    available_font = {k: v["font-desc-info"] for k, v in config["font"].items()}
+    font_desc_text = "\n".join(f"- \033[1m\033[32m{key:<8}\033[0m : {val}" for key, val in available_font.items())
+    font_hint_text = "\33[90mThe export profile can be configured under \033[4m/font/font.yml\033[0m"
+    font_help_text = "\n".join(["Which font to export? (Required):", font_desc_text, font_hint_text])
+    file_help_text = "Output file name *.ttf, default to the psName of exporting font."
+
+    parser.add_argument("font", choices=available_font, help=font_help_text)
+
+    parser.add_argument("output", nargs="?", help=file_help_text)
 
     args = parser.parse_args()
 
@@ -117,12 +124,14 @@ def main():
     if args.identifier:
         config["typeface"]["info"]["version"] = f"Version {args.identifier}"
 
-    typeface: dict = {
-        "face": face,
+    font_export: dict = {
         "style": config["typeface"]["style"][face],
-        "info": config["typeface"]["info"]
+        "info": config["typeface"]["info"],
+        "name": args.font,
+        "face": face
     }
-    profiles: dict = {
+    font_export |= config["font"][args.font]
+    font_profile: dict = {
         "typography": config["profile"]["typography"],
         "scale": config["profile"]["scale"][scale],
         "accent": config["profile"]["accent"][accent],
@@ -130,9 +139,21 @@ def main():
     }
 
     if args.verbose:
-        print("Export Profile: ", typeface, profiles)
+        print("Export Profile: ", font_export, font_profile)
 
-    export(typeface, profiles, args.output)
+    def export_fn(generated_name: str):
+        if args.output is None:
+            filename = f"{generated_name}.ttf"
+        elif str(args.output).endswith(".ttf"):
+            filename = args.output
+        else:
+            filename = f"{args.output}.ttf"
+
+        with as_file(FONT_DIR / "export") as export_path:
+            export_path.mkdir(exist_ok=True)
+            return export_path / filename
+
+    export(font_export, font_profile, export_fn)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 # Our project's staging export
+font/export/
 src/*/export/
 
 # Byte-compiled / optimized / DLL files

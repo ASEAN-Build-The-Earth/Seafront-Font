@@ -9,16 +9,16 @@
 Font exporting implementations
 """
 from fontTools.fontBuilder import FontBuilder
-from importlib.resources import as_file
+from importlib.resources import as_file, files
 from importlib.resources.abc import Traversable
 
 from sys import stderr
 from .glyphs import build_glyph
-from seafront.unicode import load_unicode_blocks
-from seafront.model.glyphs import prepare_glyphs
-from seafront.model.anchors import parse_glyph_anchors
-from seafront.afdko.anchors import export_anchor_features
-from seafront.afdko.kerning import export_kerning_feat
+from ..unicode import load_unicode_blocks
+from ..model.glyphs import prepare_glyphs
+from ..model.anchors import parse_glyph_anchors
+from ..afdko.anchors import export_anchor_features
+from ..afdko.kerning import export_kerning_feat
 
 import seafront.__about__ as about
 import seafront.font as font
@@ -34,7 +34,7 @@ def load_yaml(file: Traversable):
         return yaml.safe_load(fp)
 
 
-def export(typeface, profile, output):
+def export(font_export, profile, export_fn):
     v: bool = profile["verbose"]
     pixel_size: int = profile["scale"]
     ascender: int = profile["accent"]["ascender"]  # 35 pixel
@@ -47,11 +47,7 @@ def export(typeface, profile, output):
               f"Please either lower your scale or step down the accent{'\033[0m'}", file=stderr)
         return
 
-    print(f"Default width: {units_per_em // 2}")
-    print(f"MAX width: {profile["typography"]["maximum-width"] * pixel_size}")
-
-    family_name = typeface["info"]["family"]
-    project = load_yaml(font.project_yml())
+    family_name = font_export["info"]["family"]
     blocks = load_unicode_blocks()
     glyph = prepare_glyphs(units_per_em // 2)  # Defaulting half an em per glyph for .notdef
     built = 0
@@ -60,8 +56,8 @@ def export(typeface, profile, output):
     kerning_feature: dict = {}
 
     try:
-        for block_id in project["blocks"]:
-            face = typeface["face"]
+        for block_id in font_export["unicode-blocks"]:
+            face = font_export["face"]
 
             with as_file(font.project_glyphs(block_id, family_name, face)) as glyph_dir:
                 if not glyph_dir.exists():
@@ -140,7 +136,7 @@ def export(typeface, profile, output):
                     log(v, f"Building Extra Glyph: {index} (EXT-{index:02X})")
                     built += build_glyph(pbm, glyph, glyph_profile | ext_profile, profile["accent"])
     except Exception as e:
-        print(f"{'\033[93m'}{e}{'\033[0m'}", file=stderr)
+        print(f"{'\033[93m'}Exception when collecting glyphs:\n{e}{'\033[0m'}", file=stderr)
     if built == 0:
         raise ValueError("No available glyphs found for this typeface.")
 
@@ -181,42 +177,56 @@ def export(typeface, profile, output):
         usWidthClass=5 # Normal width, we won't have condensed or expanded width
     )
 
-    info: dict[str, str] = typeface["info"]
     license_desc: list[str] = about.__license__.splitlines()
     license_info: str = license_desc[len(license_desc) - 1]
-    strings_list: list[str] = [info["foundry-name"], family_name]
-    family_name = ' '.join(strings_list) # BTE Seafront
 
-    strings_list.append(typeface["style"])
-    full_name: str = ' '.join(strings_list) # BTE Seafront Regular
+    info: dict[str, str] = font_export["info"]
+    font_naming: list[str] = [family_name]
 
-    postscript: str = full_name.replace(' ', '-')
+    # Font may have variant name as: Seafront <name>
+    if isinstance(font_export["font-desc-name"], str) and font_export["font-desc-name"]:
+        font_naming.append(font_export["font-desc-name"])
 
-    strings_list.append(info["version"])
-    unique_string: str = ' '.join(strings_list) # BTE Seafront Regular Version 1.000
+    # The full name without foundry prefix, read as the display name often
+    public_name: str = ' '.join(font_naming)
+
+    # BTE Seafront <name>
+    font_naming.insert(0, info["foundry-name"])
+    formal_name: str = ' '.join(font_naming)
+
+    # BTE Seafront <name> Regular
+    font_naming.append(font_export["style"])
+    packed_name: str = ' '.join(font_naming)
+
+    # BTE-Seafront-<name>-Regular
+    post_script: str = packed_name.replace(' ', '-')
+
+    # BTE Seafront <name> Regular Version 1.000
+    font_naming.append(font_export["design-version"])
+    unique_name: str = ' '.join(font_naming)
 
     name_strings: dict[str, str] = {
         # (nameID 0)
         "copyright": about.__copyright__,
-        "familyName": family_name, # (nameID 1)
-        "styleName": typeface["style"], # (nameID 2)
-        "uniqueFontIdentifier": unique_string, # (nameID 3)
-        "fullName": full_name, # (nameID 4)
-        "version": info["version"], # (nameID 5)
-        "psName": postscript, # (nameID 6)
+        "familyName": formal_name,  # (nameID 1)
+        "styleName": font_export["style"],  # (nameID 2)
+        "uniqueFontIdentifier": unique_name,  # (nameID 3)
+        "fullName": packed_name,  # (nameID 4)
+        "version": font_export["design-version"],  # (nameID 5)
+        "psName": post_script,  # (nameID 6)
         # "trademark": "", # (nameID 7)
-        "manufacturer": info["manufacturer"], # (nameID 8)
-        "designer": info["designer"], # (nameID 9)
-        "description": info["description"], # (nameID 10)
-        "vendorURL": info["vendor-url"], # (nameID 11)
-        "designerURL": info["designer-url"], # (nameID 12)
-        "licenseDescription": about.__license__, # (nameID 13)
-        "licenseInfoURL": license_info, # (nameID 14)
+        "manufacturer": info["manufacturer"],  # (nameID 8)
+        "designer": font_export["design-credits"],  # (nameID 9)
+        "description": info["description"],  # (nameID 10)
+        "vendorURL": info["vendor-url"],  # (nameID 11)
+        "designerURL": info["designer-url"],  # (nameID 12)
+        "licenseDescription": about.__license__,  # (nameID 13)
+        "licenseInfoURL": license_info,  # (nameID 14)
         # (nameID 15 reserved)
-        "typographicFamily": info["family"], # (nameID 16)
-        "typographicSubfamily": typeface["style"], # (nameID 17)
-        "compatibleFullName": full_name, # (nameID 18)
-        "sampleText": info["sample-text"], # (nameID 19)
+        "typographicFamily": public_name,  # (nameID 16)
+        "typographicSubfamily": font_export["style"],  # (nameID 17)
+        "compatibleFullName": packed_name,  # (nameID 18)
+        "sampleText": font_export["sample-text"],  # (nameID 19)
     }
 
     # Prepare .fea feature file as raw text lines
@@ -266,7 +276,9 @@ def export(typeface, profile, output):
         maxMemType1=0,
     )
     log(v, "Written Metadata: ", name_strings)
-    filename = f"{postscript}.ttf" if output is None else \
-        (output if str(output).endswith(".ttf") else f"{output}.ttf")
-    fb.save(filename)
-    print(f"Wrote {filename}")
+    log(v, "Result glyphs orders: ", glyph["glyph_order"])
+
+    export_file = export_fn(post_script)
+    fb.save(export_file)
+
+    print(f"Wrote {export_file}")

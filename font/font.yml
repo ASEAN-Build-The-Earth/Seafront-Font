@@ -1,4 +1,36 @@
 # ========================
+# Available Fonts
+# ========================
+font:
+  # BTE Seafront
+  seafront:
+    design-version: "Version 1.000"
+    font-desc-name: ~
+    font-desc-info: "The standard Seafront font"
+    design-credits: > 
+      Lead designer: chr7s-c, tin. 
+      With contributions from the BuildTheEarth Community
+    unicode-blocks:
+      - "Basic Latin"
+    sample-text: |
+      The quick brown fox jumps over the lazy dog.
+      0 1 2 3 4 5 6 7 8 9 
+      A B C D E F G H I J K L M N O P Q R S T U V W X Y Z 
+      a b c d e f g h i j k l m n o p q r s t u v w x y z 
+      ! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ ` { | } ~
+  # BTE Seafront Thai
+  seafront-thai:
+    design-version: "Version 1.000"
+    font-desc-name: "Thai"
+    font-desc-info: "The Thai-script support of Seafront"
+    design-credits: > 
+      Lead designer: bkcom1234, chr7s-c, tin. 
+      With contributions from the BuildTheEarth Community.
+    unicode-blocks:
+      - "Basic Latin"
+      - "Thai"
+    sample-text: "\u0E01\u0E02\u0E03\u0E04\u0E05\u0E06\u0E07\u0E08\u0E09"
+# ========================
 # Typeface Metadata
 # ========================
 typeface:
@@ -16,20 +48,10 @@ typeface:
     # But its barely used anymore. We will use "BTE" as the our font identifying prefix.
     # ========================
     foundry-name: "BTE"
-    version: "Version 1.000"
-    designer: > 
-      Lead designer: chr7s-c, tin. 
-      With contributions from the BuildTheEarth Community.
     description: "A pixelated style typeface developed by the BuildTheEarth Community."
     manufacturer: "ASEAN-BTE"
     vendor-url: "https://github.com/ASEAN-Build-The-Earth/Seafront-Font"
     designer-url: "https://buildtheearth.net/"
-    sample-text: |
-      The quick brown fox jumps over the lazy dog.
-      0 1 2 3 4 5 6 7 8 9 
-      A B C D E F G H I J K L M N O P Q R S T U V W X Y Z 
-      a b c d e f g h i j k l m n o p q r s t u v w x y z 
-      ! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ ` { | } ~
 # ========================
 # Font profile
 # All units per pixel
