@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026, BuildTheEarth (buildtheearth.net),
+# with Reserved Font Name "BTE Seafront".
+# Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).
+#
+# This Font Software is licensed under the SIL Open Font License, Version 1.1.
+# This license is available with a FAQ at:
+# https://openfontlicense.org
 r""" export_seafront.py
 
 Commandline script to export Seafront fonts.
@@ -13,19 +20,6 @@ using python::
 
     python export_seafront.py
 """
-COPYRIGHT = """\
-Copyright (c) 2026, BuildTheEarth (buildtheearth.net), \
-Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).\
-"""
-LICENSE = """\
-Copyright (c) 2026, BuildTheEarth (buildtheearth.net),
-with Reserved Font Name "BTE Seafront".
-Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).
-
-This Font Software is licensed under the SIL Open Font License, Version 1.1.
-This license is available with a FAQ at:
-https://openfontlicense.org
-"""
 
 from pathlib import Path
 from PIL import Image
@@ -39,6 +33,7 @@ from seafront.model.anchors import parse_glyph_anchors
 from seafront.afdko.anchors import export_anchor_features
 from seafront.afdko.kerning import export_kerning_feat
 
+import seafront.__about__ as about
 import seafront.font as font
 import argparse
 import yaml
@@ -376,7 +371,7 @@ def export(typeface, profile, output):
     )
 
     info: dict[str, str] = typeface["info"]
-    license_desc: list[str] = LICENSE.splitlines()
+    license_desc: list[str] = about.__license__.splitlines()
     license_info: str = license_desc[len(license_desc) - 1]
     strings_list: list[str] = [info["foundry-name"], family_name]
     family_name = ' '.join(strings_list) # BTE Seafront
@@ -391,7 +386,7 @@ def export(typeface, profile, output):
 
     name_strings: dict[str, str] = {
         # (nameID 0)
-        "copyright": COPYRIGHT,
+        "copyright": about.__copyright__,
         "familyName": family_name, # (nameID 1)
         "styleName": typeface["style"], # (nameID 2)
         "uniqueFontIdentifier": unique_string, # (nameID 3)
@@ -404,7 +399,7 @@ def export(typeface, profile, output):
         "description": info["description"], # (nameID 10)
         "vendorURL": info["vendor-url"], # (nameID 11)
         "designerURL": info["designer-url"], # (nameID 12)
-        "licenseDescription": LICENSE, # (nameID 13)
+        "licenseDescription": about.__license__, # (nameID 13)
         "licenseInfoURL": license_info, # (nameID 14)
         # (nameID 15 reserved)
         "typographicFamily": info["family"], # (nameID 16)
