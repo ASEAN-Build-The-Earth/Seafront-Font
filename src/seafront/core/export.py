@@ -97,7 +97,7 @@ def export(typeface, profile, output):
             for pbm in sorted(glyph_dir.glob("glyph_*.pbm")):
                 index = int(pbm.stem.split("_")[1])
                 codepoint: dict = { "codepoint": int(blocks[block_id]["start"]) + (index - 1) }
-                log(v, f"Building Glyph index: {index} (U+{codepoint:04X})")
+                log(v, f"Building Glyph index: {index} (U+{codepoint["codepoint"]:04X})")
                 built += build_glyph(pbm, glyph, codepoint | glyph_profile, profile["accent"])
 
             # Check if extra features exist as glyphs config
