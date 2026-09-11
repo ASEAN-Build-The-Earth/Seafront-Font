@@ -9,7 +9,8 @@
 Project file generation code
 """
 from importlib.resources import as_file
-from pathlib import Path
+from importlib.resources.abc import Traversable
+
 from PIL import Image
 from PIL import ImageDraw
 from seafront.font import (
@@ -58,15 +59,18 @@ def generate_font_table(fn,
     return sheet
 
 
-def generate_aseprite_project(output: Path,
+def generate_aseprite_project(project_dir: Traversable,
                               is_extension: bool):
     try:
-        with (as_file(SCRIPTS_DIR / SCRIPT) as scripts,
+        # Virtual path Traversable should be convert back to
+        # pathlib to be sure aseprite file won't mistake it
+        with (as_file(project_dir) as project,
+              as_file(SCRIPTS_DIR / SCRIPT) as scripts,
               as_file(FONT_DIR) as font):
             subprocess.run([
                 "aseprite",
                 "--batch",
-                "--script-param", f"dir={output}",
+                "--script-param", f"dir={project}",
                 "--script-param", f"config={font}",
                 "--script-param", f"ext={is_extension}",
                 "--script", scripts,

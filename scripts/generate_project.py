@@ -29,6 +29,8 @@ from seafront.unicode import load_unicode_blocks
 from seafront.font import (
     project_yml,
     project_root,
+    project_font_table,
+    project_ext_font_table,
     ext_glyphs_yml,
     ASSETS_DIR
 )
@@ -54,8 +56,9 @@ def generate(block_name, block):
         null_cell = Image.open(assets / NULL_64).convert("RGBA")
         label_font = ImageFont.truetype(assets / FONT_16, 16)
 
-    with as_file(project_root(block_name)) as output:
-        output.mkdir(exist_ok=True)
+    project = project_root(block_name)
+    with as_file(project) as project_dir:
+        project_dir.mkdir(exist_ok=True)
 
     start = block["start"]
     end = block["end"]
@@ -74,12 +77,12 @@ def generate(block_name, block):
     #     sheet.save(graphics)
     #     print(f"Written Empty {graphics}")
 
-    table = output / "font-table.png"
-    exist = "Overwritten" if table.exists() else "Generated"
+    table = project_font_table(block_name)
+    exist = "Overwritten" if table.is_file() else "Generated"
     sheet.save(table)
-    print(f"{exist} {table}")
+    print(f"{exist} '{block_name}'/{table.name}")
 
-    generate_aseprite_project(output, False)
+    generate_aseprite_project(project, False)
 
     extension: Traversable = ext_glyphs_yml(block_name)
     if extension.is_file():
@@ -93,12 +96,12 @@ def generate(block_name, block):
         print(f"{len(glyphs)} glyphs Extension feature found for '{block_name}' unicode range")
 
         sheet = generate_font_table(fn, len(glyphs), columns, label_font)
-        table = output / "ext-font-table.png"
-        exist = "Overwritten" if table.exists() else "Generated"
+        table = project_ext_font_table(block_name)
+        exist = "Overwritten" if table.is_file() else "Generated"
         sheet.save(table)
-        print(f"{exist} Extension {table}")
+        print(f"{exist} Extension '{block_name}'/{table.name}")
 
-        generate_aseprite_project(output, True)
+        generate_aseprite_project(project, True)
 
 
 def main():

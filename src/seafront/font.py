@@ -43,6 +43,14 @@ def project_root(block_name: str) -> Traversable:
     return PROJECT_DIR / block_name
 
 
+def project_font_table(block_name: str) -> Traversable:
+    return PROJECT_DIR / block_name / "font-table.png"
+
+
+def project_ext_font_table(block_name: str) -> Traversable:
+    return PROJECT_DIR / block_name / "ext-font-table.png"
+
+
 def project_glyphs(block_name: str, family: str, style: str) -> Traversable:
     return PROJECT_DIR / block_name / "glyphs" / family / style
 
