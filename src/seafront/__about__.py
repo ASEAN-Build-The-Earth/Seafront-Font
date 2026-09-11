@@ -1,0 +1,5 @@
+__version__ = "1.0.0.dev1"
+__author__ = "Tin"
+__email__ = "tintinkung.lemonade@gmail.com"
+__license__ = "OFL-1.1"
+__copyright__ = "Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia)"
