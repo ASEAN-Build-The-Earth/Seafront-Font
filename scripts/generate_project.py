@@ -1,15 +1,26 @@
 #!/usr/bin/env python3
-"""\
-Copyright (c) 2026, BuildTheEarth (buildtheearth.net),
-with Reserved Font Name "BTE Seafront".
-Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).
+# Copyright (c) 2026, BuildTheEarth (buildtheearth.net),
+# with Reserved Font Name "BTE Seafront".
+# Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).
+#
+# This Font Software is licensed under the SIL Open Font License, Version 1.1.
+# This license is available with a FAQ at:
+# https://openfontlicense.org
+r"""generate_projects.py
 
-This Font Software is licensed under the SIL Open Font License, Version 1.1.
-This license is available with a FAQ at:
-https://openfontlicense.org
+Commandline script to generate Seafront fonts project files.
+
+Usage
+-----
+using hatch::
+
+    hatch run generate-project
+
+using python::
+
+    python generate_project.py
 """
-
-from pathlib import Path
+from importlib.resources import as_file
 import subprocess
 import argparse
 import yaml
@@ -18,43 +29,41 @@ from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
 
-from scripts.blocks import load_unicode_blocks
-
+from seafront.unicode import load_unicode_blocks
+from seafront.font import (
+    project_yml,
+    project_root,
+    ASSETS_DIR,
+    SCRIPTS_DIR,
+    FONT_DIR
+)
 COLUMN_SIZE: int = 16
 CELL_SIZE: int = 64
 
-ROOT = Path(__file__).resolve().parent
-
-SCRIPT: str = "scripts/aseprite/create-project.lua"
-ASSETS: Path = ROOT / "assets"
-CONFIG: Path = ROOT / "config"
-PROJECT: Path = CONFIG / "project.yml"
-FONT_16: Path = ASSETS / "BTE-Seafront-Square-Regular.ttf"
+SCRIPT: str = "aseprite/create-project.lua"
+FONT_16: str = "BTE-Seafront-Square-Regular.ttf"
+CELL_64: str = "font-cell-64px.png"
+NULL_64: str = "null-cell-64px.png"
 
 def load_project():
-    with open(PROJECT, encoding="utf-8") as fp:
+    with project_yml().open(encoding="utf-8") as fp:
         return yaml.safe_load(fp)
 
 
-def generate(block_id, block):
+def generate(block_name, block):
     start = block["start"]
     end = block["end"]
 
     count = end - start + 1
     rows = (count + COLUMN_SIZE - 1) // COLUMN_SIZE
 
-    font_cell = Image.open(
-        ASSETS / "font-cell-64px.png"
-    ).convert("RGBA")
+    with as_file(ASSETS_DIR) as assets:
+        font_cell = Image.open(assets / CELL_64).convert("RGBA")
+        null_cell = Image.open(assets / NULL_64).convert("RGBA")
+        label_font = ImageFont.truetype(assets / FONT_16, 16)
 
-    null_cell = Image.open(
-        ASSETS / "null-cell-64px.png"
-    ).convert("RGBA")
-
-    label_font = ImageFont.truetype(FONT_16, 16)
-
-    output: Path = ROOT / "src" / block_id
-    output.mkdir(exist_ok=True)
+    with as_file(project_root(block_name)) as output:
+        output.mkdir(exist_ok=True)
 
     sheet = Image.new(
         "RGBA",
@@ -104,13 +113,15 @@ def generate(block_id, block):
     print(f"{exist} {table}")
 
     try:
-        subprocess.run([
-            "aseprite",
-            "--batch",
-            "--script-param", f"dir={output}",
-            "--script-param", f"config={CONFIG}",
-            "--script", SCRIPT,
-        ], check=True)
+        with (as_file(SCRIPTS_DIR / SCRIPT) as scripts,
+              as_file(FONT_DIR) as font):
+            subprocess.run([
+                "aseprite",
+                "--batch",
+                "--script-param", f"dir={output}",
+                "--script-param", f"config={font}",
+                "--script", scripts,
+            ], check=True)
     except subprocess.CalledProcessError:
         print(f"Error generating Aseprite project file.")
         pass  # handle errors in the called executable
@@ -151,4 +162,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

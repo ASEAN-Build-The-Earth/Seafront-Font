@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
+# Copyright (c) 2026, BuildTheEarth (buildtheearth.net),
+# with Reserved Font Name "BTE Seafront".
+# Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).
+#
+# This Font Software is licensed under the SIL Open Font License, Version 1.1.
+# This license is available with a FAQ at:
+# https://openfontlicense.org
 """\
-Copyright (c) 2026, BuildTheEarth (buildtheearth.net),
-with Reserved Font Name "BTE Seafront".
-Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).
-
-This Font Software is licensed under the SIL Open Font License, Version 1.1.
-This license is available with a FAQ at:
-https://openfontlicense.org
+Internal Edge tracing extraction for bitmaps
 """
 
 from collections import defaultdict
@@ -16,6 +16,7 @@ Point = tuple[int, int]
 Edge = tuple[Point, Point]
 UniqueEdges = dict[tuple[Point, Point], Edge] # key used only for duplicate detection
 Path = list[Edge]
+
 
 def extract(fn: Callable[[int, int], float | tuple[int, ...]],
             w: int,
@@ -92,6 +93,7 @@ def extract(fn: Callable[[int, int], float | tuple[int, ...]],
 
     return edges, bounds
 
+
 def chain(boundary: UniqueEdges) -> list[Path]:
     """
     Chain edges into continuous loops (polygons)
@@ -146,6 +148,7 @@ def direction(edge: Edge) -> tuple[bool, bool]:
     (x1, y1), (x2, y2) = edge
 
     return (x2 > x1) - (x2 < x1), (y2 > y1) - (y2 < y1)
+
 
 def simplify(loop: Path) -> Path:
     """

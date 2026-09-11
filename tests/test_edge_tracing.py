@@ -1,16 +1,14 @@
-#!/usr/bin/env python3
+# Copyright (c) 2026, BuildTheEarth (buildtheearth.net),
+# with Reserved Font Name "BTE Seafront".
+# Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).
+#
+# This Font Software is licensed under the SIL Open Font License, Version 1.1.
+# This license is available with a FAQ at:
+# https://openfontlicense.org
 """\
-Copyright (c) 2026, BuildTheEarth (buildtheearth.net),
-with Reserved Font Name "BTE Seafront".
-Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).
-
-This Font Software is licensed under the SIL Open Font License, Version 1.1.
-This license is available with a FAQ at:
-https://openfontlicense.org
+Test for edge tracing from pbm bitmaps to vector paths.
 """
-
-import unittest
-from extract import extract, chain, simplify, Point, Path
+from seafront.core.extract import extract, chain, simplify, Point, Path
 
 # --------------------------------------------------
 # Uncomment for debugging, matplotlib required.
@@ -96,7 +94,7 @@ def setup():
     fn = lambda x, y: test[y][x]
     return expected, extract(fn, w, h, 1, h,1)
 
-class TestEdgeTracing(unittest.TestCase):
+class TestEdgeTracing:
 
     def test(self):
         expected, (edges, bounds) = setup()
@@ -106,7 +104,7 @@ class TestEdgeTracing(unittest.TestCase):
         # plot_as_fig(plt, paths)
         # --------------------------------------------------
 
-        self.assertEqual(3, len(paths))
+        assert len(paths) == 3
         print("Edges: ", edges.values())
 
         simplified: list[list[Point]] = []
@@ -122,7 +120,4 @@ class TestEdgeTracing(unittest.TestCase):
         for path in simplified:
             print("Simplified: ", path)
 
-        self.assertListEqual(expected, simplified)
-
-if __name__ == '__main__':
-    unittest.main()
+        assert expected == simplified

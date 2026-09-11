@@ -1,4 +1,18 @@
 #!/usr/bin/env python3
+r""" export_seafront.py
+
+Commandline script to export Seafront fonts.
+
+Usage
+-----
+using hatch::
+
+    hatch run export-seafront
+
+using python::
+
+    python export_seafront.py
+"""
 COPYRIGHT = """\
 Copyright (c) 2026, BuildTheEarth (buildtheearth.net), \
 Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).\
@@ -7,7 +21,7 @@ LICENSE = """\
 Copyright (c) 2026, BuildTheEarth (buildtheearth.net),
 with Reserved Font Name "BTE Seafront".
 Copyright (c) 2026, ASEAN-BTE (asean.buildtheearth.asia).
-      
+
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is available with a FAQ at:
 https://openfontlicense.org
@@ -17,8 +31,11 @@ from pathlib import Path
 from PIL import Image
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
-from scripts.extract import extract, chain, simplify, Edge
-from scripts.blocks import load_unicode_blocks
+from importlib.resources import as_file
+from importlib.resources.abc import Traversable
+from seafront.core.extract import extract, chain, simplify, Edge
+from seafront.unicode import load_unicode_blocks
+from seafront.font import font_yml, project_yml, project_glyphs
 
 import argparse
 import yaml
@@ -27,21 +44,16 @@ import sys
 VERBOSE = False
 CELL_SIZE: int = 64
 
-ROOT = Path(__file__).resolve().parent
-CONFIG: Path = ROOT / "config"
-PROJECT: Path = CONFIG / "project.yml"
-FONT: Path = CONFIG / "font.yml"
 
-def to_glyphs_dir(block: str, family: str, style: str) -> Path:
-    return ROOT / "src" / block / "glyphs" / family / style
-
-def load_yaml(file: Path):
-    with open(file, encoding="utf-8") as fp:
+def load_yaml(file: Traversable):
+    with file.open(encoding="utf-8") as fp:
         return yaml.safe_load(fp)
+
 
 def log(verbose=False, *args):
     if verbose:
         print(*args)
+
 
 def draw_glyphs(verbose: bool, pen: TTGlyphPen, paths: list[list[Edge]]):
     """
@@ -51,6 +63,7 @@ def draw_glyphs(verbose: bool, pen: TTGlyphPen, paths: list[list[Edge]]):
     :param pen: Glyph pen to draw
     :param paths: Path list to render
     """
+
     def draw_glyph(path: list[Edge]):
         log(verbose, f"Starting {path[0][0]}")
         pen.moveTo(path[0][0])
@@ -62,8 +75,9 @@ def draw_glyphs(verbose: bool, pen: TTGlyphPen, paths: list[list[Edge]]):
         pen.closePath()
 
     for edge_list in paths:
-        simplified = simplify(edge_list) # simplify edge list to a single path
+        simplified = simplify(edge_list)  # simplify edge list to a single path
         draw_glyph(simplified)
+
 
 # ------------------------------
 # Build glyphs
@@ -137,7 +151,7 @@ def build_glyph(pbm: Path,
         pen = TTGlyphPen(None)
 
         glyph["glyphs"][glyph_name] = pen.glyph()  # Empty glyph
-        glyph["metrics"][glyph_name] = (white_space  * pixel_size, 0)
+        glyph["metrics"][glyph_name] = (white_space * pixel_size, 0)
         glyph["glyph_order"].append(glyph_name)
         glyph["cmap"][codepoint] = glyph_name
         return 1
@@ -169,22 +183,22 @@ def build_glyph(pbm: Path,
         advance_width = profile["typography"]["monospace-width"]
         start_padding = (advance_width - glyph_width) / 2
 
-        if v: # Verbose logging in case a glyph is not centered by default
+        if v:  # Verbose logging in case a glyph is not centered by default
             position = (origin_x + advance_width) - (max_x + 1)
             if position != start_padding:
                 log(v, f"{'\033[93m'}Monospace glyph "
-                      f"for U+{codepoint:04X} is not centered: "
-                      f"\nPadding is expected to span the width equally"
-                      f"\n\tExpected: {start_padding} + {start_padding}"
-                      f"\n\tGot: {position} + {(advance_width - position - glyph_width)}{'\033[0m'}")
+                       f"for U+{codepoint:04X} is not centered: "
+                       f"\nPadding is expected to span the width equally"
+                       f"\n\tExpected: {start_padding} + {start_padding}"
+                       f"\n\tGot: {position} + {(advance_width - position - glyph_width)}{'\033[0m'}")
 
-    lsb: int = int( start_padding * pixel_size )
+    lsb: int = int(start_padding * pixel_size)
     advance: int = (advance_width + right_padding) * pixel_size
     log(v, f"U+{codepoint:04X}"
-        f" bounds=({min_x},{min_y})-({max_x},{max_y}),"
-        f" size={glyph_width}x{glyph_height},"
-        f" lsb={lsb},"
-        f" adv={advance}")
+           f" bounds=({min_x},{min_y})-({max_x},{max_y}),"
+           f" size={glyph_width}x{glyph_height},"
+           f" lsb={lsb},"
+           f" adv={advance}")
 
     pen = TTGlyphPen(None)
     paths = chain(edges)
@@ -197,6 +211,7 @@ def build_glyph(pbm: Path,
     glyph["metrics"][glyph_name] = (advance, lsb)
     glyph["cmap"][codepoint] = glyph_name
     return 1
+
 
 def export(typeface, profile, output):
     v: bool = profile["verbose"]
@@ -215,21 +230,21 @@ def export(typeface, profile, output):
     print(f"MAX width: {profile["typography"]["maximum-width"] * pixel_size}")
 
     family_name = typeface["info"]["family"]
-    project = load_yaml(PROJECT)
+    project = load_yaml(project_yml())
     blocks = load_unicode_blocks()
-    glyph = prepare_glyphs(units_per_em // 2) # Defaulting half an em per glyph for .notdef
+    glyph = prepare_glyphs(units_per_em // 2)  # Defaulting half an em per glyph for .notdef
     built = 0
 
     try:
         for block_id in project["blocks"]:
             face = typeface["face"]
-            glyph_dir: Path = to_glyphs_dir(block_id, family_name, face)
 
-            if not glyph_dir.exists():
-                raise ValueError(
-                    f"Glyphs for '{block_id}' with style '{face}' referenced in project.yml "
-                    f"does not exist for exporting at: \n'{glyph_dir}'"
-                )
+            with as_file(project_glyphs(block_id, family_name, face)) as glyph_dir:
+                if not glyph_dir.exists():
+                    raise ValueError(
+                        f"Glyphs for '{block_id}' with style '{face}' referenced in project.yml "
+                        f"does not exist for exporting at: \n'{glyph_dir}'"
+                    )
 
             for pbm in sorted(glyph_dir.glob("glyph_*.pbm")):
                 index = int(pbm.stem.split("_")[1])
@@ -342,8 +357,9 @@ def export(typeface, profile, output):
     fb.save(filename)
     print(f"Wrote {filename}")
 
+
 def main():
-    config = load_yaml(FONT)
+    config = load_yaml(font_yml())
 
     parser = argparse.ArgumentParser(description='Export a TrueType font from this project')
 
@@ -439,6 +455,7 @@ def main():
 
     log(args.verbose, "Export Profile: ", typeface, profiles)
     export(typeface, profiles, args.output)
+
 
 if __name__ == "__main__":
     main()
