@@ -29,6 +29,9 @@ if source == nil then
     error("No sprite opened")
 end
 
+local app_filename = app.fs.fileName(app.sprite.filename)
+local is_extension = app_filename:match("^ext%-(.+)%.aseprite$") and true or false
+
 local configPath = config .. "/font.yml"
 local dir = app.fs.filePath(app.sprite.filename)
 local exportPath = app.fs.joinPath(dir, "export")
@@ -56,14 +59,15 @@ local function exportGraphic(design, family)
     ------------------------------------------------------------
     -- Constants
     ------------------------------------------------------------
-    local fileOutput = app.fs.joinPath(out, style .. ".aseprite")
+    local name = is_extension and ("ext-" .. style) or style
+    local fileOutput = app.fs.joinPath(out, name .. ".aseprite")
 
     local CELL = 64
-    local COLUMNS = 16
     local PBM_CELL = 32
 
     local rows = math.floor(source.height / CELL)
-    local glyphCount = rows * COLUMNS
+    local columns = math.floor(source.width / CELL)
+    local glyphCount = rows * columns
     local export = Sprite(PBM_CELL, PBM_CELL, ColorMode.RGB)
 
     export.filename = fileOutput
@@ -98,8 +102,8 @@ local function exportGraphic(design, family)
         local cropX = typography["origin-x"] - leftX
         local cropY = typography["origin-y"] + accent["descender"]
 
-        local x = (i % COLUMNS) * CELL - imageX + cropX
-        local y = math.floor(i / COLUMNS) * CELL - imageY + cropY
+        local x = (i % columns) * CELL - imageX + cropX
+        local y = math.floor(i / columns) * CELL - imageY + cropY
 
         image:drawImage(sourceImage, Point(-x, -y))
 
@@ -130,11 +134,7 @@ for _, family in ipairs(font.typeface.family) do
 
 	print("Exporting sprite sheet for: " .. family)
 
-
     for _, design in ipairs(layers) do
-
         exportGraphic(design, family)
-
-
     end
 end

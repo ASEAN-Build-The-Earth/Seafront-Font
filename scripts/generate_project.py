@@ -21,42 +21,34 @@ using python::
     python generate_project.py
 """
 from importlib.resources import as_file
-import subprocess
-import argparse
-import yaml
-
+from importlib.resources.abc import Traversable
 from PIL import Image
-from PIL import ImageDraw
 from PIL import ImageFont
-
+from seafront.generate import generate_font_table, generate_aseprite_project
 from seafront.unicode import load_unicode_blocks
 from seafront.font import (
     project_yml,
     project_root,
-    ASSETS_DIR,
-    SCRIPTS_DIR,
-    FONT_DIR
+    ext_glyphs_yml,
+    ASSETS_DIR
 )
-COLUMN_SIZE: int = 16
-CELL_SIZE: int = 64
+import yaml
+import argparse
 
-SCRIPT: str = "aseprite/create-project.lua"
+COLUMN_SIZE: int = 16
+"""We will format all font tables by 16 columns and x rows"""
+
 FONT_16: str = "BTE-Seafront-Square-Regular.ttf"
 CELL_64: str = "font-cell-64px.png"
 NULL_64: str = "null-cell-64px.png"
 
-def load_project():
-    with project_yml().open(encoding="utf-8") as fp:
+
+def load_yaml(file: Traversable):
+    with file.open(encoding="utf-8") as fp:
         return yaml.safe_load(fp)
 
 
 def generate(block_name, block):
-    start = block["start"]
-    end = block["end"]
-
-    count = end - start + 1
-    rows = (count + COLUMN_SIZE - 1) // COLUMN_SIZE
-
     with as_file(ASSETS_DIR) as assets:
         font_cell = Image.open(assets / CELL_64).convert("RGBA")
         null_cell = Image.open(assets / NULL_64).convert("RGBA")
@@ -65,14 +57,14 @@ def generate(block_name, block):
     with as_file(project_root(block_name)) as output:
         output.mkdir(exist_ok=True)
 
-    sheet = Image.new(
-        "RGBA",
-        (
-            COLUMN_SIZE * CELL_SIZE,
-            rows * CELL_SIZE,
-        ),
-        (255, 255, 255, 0),
+    start = block["start"]
+    end = block["end"]
+    count = end - start + 1
+    fn = lambda i: (
+        f"U+{(start + i):04X}",
+        null_cell if ((start + i) < 0x20 or 0x7F <= (start + i) <= 0x9F) else font_cell
     )
+    sheet = generate_font_table(fn, count, COLUMN_SIZE, label_font)
 
     # TODO: Adapt to new graphics directory
     # graphics = output / "regular.png"
@@ -81,60 +73,38 @@ def generate(block_name, block):
     #     sheet.save(graphics)
     #     print(f"Written Empty {graphics}")
 
-    draw = ImageDraw.Draw(sheet)
-
-    for i in range(count):
-
-        codepoint = start + i
-
-        row = i // COLUMN_SIZE
-        col = i % COLUMN_SIZE
-
-        x = col * CELL_SIZE
-        y = row * CELL_SIZE
-
-        if codepoint < 0x20 or 0x7F <= codepoint <= 0x9F:
-            cell = null_cell
-        else:
-            cell = font_cell
-
-        sheet.alpha_composite(cell, (x, y))
-
-        draw.text(
-            (x + 5, y - 1),
-            f"U+{codepoint:04X}",
-            font=label_font,
-            fill=(70, 70, 70),
-        )
-
     table = output / "font-table.png"
     exist = "Overwritten" if table.exists() else "Generated"
     sheet.save(table)
     print(f"{exist} {table}")
 
-    try:
-        with (as_file(SCRIPTS_DIR / SCRIPT) as scripts,
-              as_file(FONT_DIR) as font):
-            subprocess.run([
-                "aseprite",
-                "--batch",
-                "--script-param", f"dir={output}",
-                "--script-param", f"config={font}",
-                "--script", scripts,
-            ], check=True)
-    except subprocess.CalledProcessError:
-        print(f"Error generating Aseprite project file.")
-        pass  # handle errors in the called executable
-    except OSError:
-        print(f"Aseprite not found in system. Cannot generate project file.")
-        pass  # executable not found
+    generate_aseprite_project(output, False)
+
+    extension: Traversable = ext_glyphs_yml(block_name)
+    if extension.is_file():
+        glyphs_yml = load_yaml(extension)
+        columns = glyphs_yml["column"]
+        glyphs = glyphs_yml["glyphs"]
+        fn = lambda i: (
+            f"ext-{i:02X}",
+            font_cell if glyphs[f"ext-{i:02X}"]["name"] else null_cell
+        )
+        print(f"{len(glyphs)} glyphs Extension feature found for '{block_name}' unicode range")
+
+        sheet = generate_font_table(fn, len(glyphs), columns, label_font)
+        table = output / "ext-font-table.png"
+        exist = "Overwritten" if table.exists() else "Generated"
+        sheet.save(table)
+        print(f"{exist} Extension {table}")
+
+        generate_aseprite_project(output, True)
+
 
 def main():
     unicode_blocks = load_unicode_blocks()
-    project = load_project()
+    project = load_yaml(project_yml())
 
     parser = argparse.ArgumentParser()
-
     parser.add_argument(
         "block",
         nargs="?",
@@ -142,21 +112,17 @@ def main():
     )
 
     args = parser.parse_args()
-
     if args.block:
         if args.block not in unicode_blocks:
             raise ValueError(f"Unknown Unicode block '{args.block}'")
-
         generate(args.block, unicode_blocks[args.block])
         return
 
     for block_id in project["blocks"]:
-
         if block_id not in unicode_blocks:
             raise ValueError(
                 f"'{block_id}' referenced in project.yml but not found in unicode-blocks.json"
             )
-
         generate(block_id, unicode_blocks[block_id])
 
 

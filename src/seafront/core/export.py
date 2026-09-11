@@ -65,10 +65,12 @@ def export(typeface, profile, output):
 
             with as_file(font.project_glyphs(block_id, family_name, face)) as glyph_dir:
                 if not glyph_dir.exists():
-                    raise ValueError(
+                    error = (
                         f"Glyphs for '{block_id}' with style '{face}' referenced in project.yml "
                         f"does not exist for exporting at: \n'{glyph_dir}'"
                     )
+                    print(f"{'\033[93m'}{error}{'\033[0m'}", file=stderr)
+                    continue
 
             anchors_yml: Traversable = font.anchors_yml(block_id)
             kerning_yml: Traversable = font.kerning_yml(block_id)
@@ -78,26 +80,65 @@ def export(typeface, profile, output):
                 anchors_feature[block_id] = glyph_anchors
                 return glyph_anchors
 
+            # Kerning feature is processed purely under OpenType feature
+            if kerning_yml.is_file():
+                kerning_feature[block_id] = kerning_yml
+
             # Anchors positioning required to adjust each glyph if configured
             anchors = load_anchors() if anchors_yml.is_file() else None
+            glyph_profile: dict = {
+                "pixel_size": pixel_size,
+                "anchors": anchors,
+                "verbose": v,
+                "typeface": face,
+                "typography": profile["typography"]
+            }
 
             for pbm in sorted(glyph_dir.glob("glyph_*.pbm")):
                 index = int(pbm.stem.split("_")[1])
-                codepoint = int(blocks[block_id]["start"]) + (index - 1)
-                glyph_profile: dict = {
-                    "codepoint": codepoint,
-                    "pixel_size": pixel_size,
-                    "anchors": anchors,
-                    "verbose": v,
-                    "typeface": face,
-                    "typography": profile["typography"]
-                }
+                codepoint: dict = { "codepoint": int(blocks[block_id]["start"]) + (index - 1) }
                 log(v, f"Building Glyph index: {index} (U+{codepoint:04X})")
-                built += build_glyph(pbm, glyph, glyph_profile, profile["accent"])
+                built += build_glyph(pbm, glyph, codepoint | glyph_profile, profile["accent"])
 
-            # Post build: kerning feature is processed purely under OpenType feature
-            if kerning_yml.is_file():
-                kerning_feature[block_id] = kerning_yml
+            # Check if extra features exist as glyphs config
+            feat_glyphs = font.ext_glyphs_yml(block_id)
+
+            if feat_glyphs.is_file():
+                ext_glyph_yml = load_yaml(feat_glyphs)
+                with as_file(font.project_glyphs(block_id, family_name, f"ext-{face}")) as ext_glyph_dir:
+                    if not ext_glyph_dir.exists():
+                        error = (
+                            f"Extra glyphs for '{block_id}' required in profile/ext-glyphs.yml "
+                            f"does not exist for exporting at: \n'{ext_glyph_dir.name}'"
+                        )
+                        print(f"{'\033[93m'}{error}{'\033[0m'}", file=stderr)
+                        continue
+
+                # Extra glyphs has user defined name
+                def fn_ext_glyph_at(i) -> dict | None:
+                    key = f"ext-{i:02X}"
+                    if key in ext_glyph_yml["glyphs"]:
+                        return ext_glyph_yml["glyphs"][key]
+                    return None
+
+                # Add all Extra glyphs
+                for pbm in sorted(ext_glyph_dir.glob("glyph_*.pbm")):
+                    index = int(pbm.stem.split("_")[1]) - 1
+                    ext_glyph = fn_ext_glyph_at(index)
+                    if not ext_glyph:
+                        error = (
+                            f"No definition found for Extra glyph at:\n{pbm}\n"
+                            f"Expected key required in ext-glyph.yml: 'ext-{index:02X}': "
+                        )
+                        print(f"{'\033[93m'}{error}{'\033[0m'}", file=stderr)
+                        continue
+
+                    ext_profile: dict = {
+                        "codepoint": ext_glyph["cmap"] if "cmap" in ext_glyph else None,
+                        "glyph_name": ext_glyph["name"] if "name" in ext_glyph else None
+                    }
+                    log(v, f"Building Extra Glyph: {index} (EXT-{index:02X})")
+                    built += build_glyph(pbm, glyph, glyph_profile | ext_profile, profile["accent"])
     except Exception as e:
         print(f"{'\033[93m'}{e}{'\033[0m'}", file=stderr)
     if built == 0:

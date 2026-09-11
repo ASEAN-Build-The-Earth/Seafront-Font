@@ -61,3 +61,7 @@ def anchors_yml(block_name: str) -> Traversable:
 
 def kerning_yml(block_name: str) -> Traversable:
     return PROJECT_DIR / block_name / "profile" / "kerning.yml"
+
+
+def ext_glyphs_yml(block_name: str) -> Traversable:
+    return PROJECT_DIR / block_name / "profile" / "ext-glyphs.yml"

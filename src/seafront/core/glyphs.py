@@ -13,7 +13,7 @@ from PIL import Image
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from .extract import extract, chain, simplify, Edge
 
-import sys
+from sys import stderr
 
 
 def log(verbose=False, *args):
@@ -80,12 +80,31 @@ def build_glyph(pbm: Path,
 
     # Glyph's identity
     # Standard uni0000 (:04X) Unicode glyph naming
-    glyph_name: str = f"uni{codepoint:04X}"
+    glyph_name: str
+    is_extension: bool = False
+
+    # Check for codepoint identity
+    if isinstance(codepoint, int):
+        if "glyph_name" in profile:
+            is_extension = True
+            glyph_name = profile["glyph_name"]
+        else:
+            glyph_name = f"uni{codepoint:04X}"
+    else:
+        # Else, glyph name must be specified
+        if "glyph_name" not in profile:
+            print(
+                f"{'\033[93m'}Non-unicode glyph for:\n{pbm}"
+                f"\n require name to be set in its profile{'\033[0m'}",
+                file=stderr
+            )
+            return 0
+        is_extension = True
+        glyph_name = profile["glyph_name"]
 
     # Special case for space character (U+0020)
-    if codepoint == 32:
-        glyph_name = f"uni{codepoint:04X}"
-
+    # TODO: Maybe a specific function for this?
+    if not is_extension and codepoint == 0x0020:
         log(v, f"Writing whitespace U+{codepoint:04X} as {white_space}px")
         pen = TTGlyphPen(None)
 
@@ -123,7 +142,7 @@ def build_glyph(pbm: Path,
     boundary = extract(fn, w, h, origin_x, origin_y + y_anchor, pixel_size)
 
     if boundary is None:
-        print(f"{'\033[93m'}Glyph for U+{codepoint:04X} is empty{'\033[0m'}", file=sys.stderr)
+        print(f"{'\033[93m'}Glyph for {glyph_name} is empty{'\033[0m'}", file=stderr)
         return 0
 
     edges, bounds = boundary
@@ -149,14 +168,14 @@ def build_glyph(pbm: Path,
             position = (origin_x + advance_width) - (max_x + 1)
             if position != start_padding:
                 log(v, f"{'\033[93m'}Monospace glyph "
-                       f"for U+{codepoint:04X} is not centered: "
+                       f"for {glyph_name} is not centered: "
                        f"\nPadding is expected to span the width equally"
                        f"\n\tExpected: {start_padding} + {start_padding}"
                        f"\n\tGot: {position} + {(advance_width - position - glyph_width)}{'\033[0m'}")
 
     lsb: int = int(start_padding * pixel_size)
     advance: int = (advance_width + right_padding) * pixel_size
-    log(v, f"U+{codepoint:04X}"
+    log(v, f"{glyph_name}"
            f" bounds=({min_x},{min_y})-({max_x},{max_y}),"
            f" size={glyph_width}x{glyph_height},"
            f" lsb={lsb},"
@@ -196,6 +215,23 @@ def build_glyph(pbm: Path,
             anchor["mark"]["base"]["x"] -= (origin_x + min_x - 1)
             anchor["mark"]["mkmk"]["x"] -= (origin_x + min_x - 1)
 
-    glyph["glyph_order"].append(glyph_name)
-    glyph["cmap"][codepoint] = glyph_name
+    if is_extension:
+        unicode_name = glyph_name.split('.')[0]
+        try:
+            # Insert extensions to their Unicode counterpart so the order looks pretty
+            # For example: uni0E4B, uni0E4B.narrow, uni0E4B.small, uni0E4C, ...
+            target_index = glyph["glyph_order"].index(unicode_name)
+            if target_index and (unicode_name == glyph_name):
+                error: str = f"Warning: extension glyph override existing glyph for '{glyph_name}'"
+                print(f"\033[93m{error}\033[0m", file=stderr)
+
+            glyph["glyph_order"].insert(target_index + 1, glyph_name)
+        except ValueError:
+            glyph["glyph_order"].append(glyph_name)
+    else:
+        glyph["glyph_order"].append(glyph_name)
+
+    if isinstance(codepoint, int):
+        glyph["cmap"][codepoint] = glyph_name
+        
     return 1
