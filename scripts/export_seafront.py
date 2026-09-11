@@ -35,8 +35,11 @@ from importlib.resources import as_file
 from importlib.resources.abc import Traversable
 from seafront.core.extract import extract, chain, simplify, Edge
 from seafront.unicode import load_unicode_blocks
-from seafront.font import font_yml, project_yml, project_glyphs
+from seafront.model.anchors import parse_glyph_anchors
+from seafront.afdko.anchors import export_anchor_features
+from seafront.afdko.kerning import export_kerning_feat
 
+import seafront.font as font
 import argparse
 import yaml
 import sys
@@ -143,6 +146,10 @@ def build_glyph(pbm: Path,
             f"Expected {pbm_cell}*{pbm_cell}, Got {w}*{h} at:\n'{pbm}'"
         )
 
+    # Glyph's identity
+    # Standard uni0000 (:04X) Unicode glyph naming
+    glyph_name: str = f"uni{codepoint:04X}"
+
     # Special case for space character (U+0020)
     if codepoint == 32:
         glyph_name = f"uni{codepoint:04X}"
@@ -156,9 +163,32 @@ def build_glyph(pbm: Path,
         glyph["cmap"][codepoint] = glyph_name
         return 1
 
+        # Glyph's positional profile
+    y_anchor: int = 0
+    x_anchor: int = 0
+    anchor: dict | None = None
+    anchor_type: str | None = None
+    options = dict(base="base", above="mark", below="mark")
+
+    if isinstance(profile["anchors"], dict):
+        anchors = profile["anchors"]
+
+        # If this glyph has anchor configuration
+        if glyph_name in anchors:
+            positioning = anchors[glyph_name]
+            anchor = positioning["anchor"]
+            glyph_class = positioning["anchor"]["type"]
+            anchor_type = options[glyph_class]
+
+            if anchor_type == "mark":
+                y_anchor += profile["typography"]["anchors"]["mark"][glyph_class]
+
+            x_anchor += int(positioning["pos"]["x"])
+            y_anchor += int(positioning["pos"]["y"])
+
     pixels = image.load()
     fn = lambda x, y: pixels[x, y] if pixels is not None else 1
-    boundary = extract(fn, w, h, origin_x, origin_y, pixel_size)
+    boundary = extract(fn, w, h, origin_x, origin_y + y_anchor, pixel_size)
 
     if boundary is None:
         print(f"{'\033[93m'}Glyph for U+{codepoint:04X} is empty{'\033[0m'}", file=sys.stderr)
@@ -173,7 +203,7 @@ def build_glyph(pbm: Path,
     # This 2 metrics determined how glyph is displayed relative to its "advance" width
     # The "lsb" is the starting point of the glyph's minimum point
 
-    start_padding = origin_x - min_x
+    start_padding = origin_x - min_x + x_anchor
     advance_width = max_x - origin_x + 1
 
     # Only monospace will need special care to ensure every glyph has same width
@@ -204,11 +234,37 @@ def build_glyph(pbm: Path,
     paths = chain(edges)
     draw_glyphs(v, pen, paths)
 
-    glyph_name = f"uni{codepoint:04X}"
+    glyph["glyphs"][glyph_name] = pen.glyph()
+
+    if not anchor_type == "mark":
+        glyph["metrics"][glyph_name] = (advance, lsb)
+    else:
+        # Mark classes required to be zero width as
+        # it would position vertically from left side character
+        glyph["metrics"][glyph_name] = (0, lsb - advance)
+
+    if anchor is not None:
+        if not anchor_type == "mark":
+            # Default anchor will be positioned right-most of the glyph
+            anchor["base"]["below"]["x"] += advance_width
+            anchor["base"]["above"]["x"] += advance_width
+
+            # With 2 anchor: below at y=0, and above at x-height
+            anchor["base"]["above"]["y"] += profile["typography"]["x-height"]
+        else:
+            # Above-marks need to shift the anchor up to its y position
+            if anchor["type"] == "above":
+                anchor["mark"]["base"]["y"] += (max_y - 1) + profile["typography"]["anchors"]["mark"][anchor["type"]]
+                anchor["mark"]["mkmk"]["y"] += (max_y - 1) + profile["typography"]["anchors"]["mark"][anchor["type"]]
+
+            anchor["mark"]["mkmk"]["y"] += profile["typography"]["anchors"]["mkmk"][anchor["type"]]
+
+            # This one follow the metrics' x position
+            # anchor["mark"]["base"]["x"] -= (origin_x + min_x - 1 - x_anchor)
+            anchor["mark"]["base"]["x"] -= (origin_x + min_x - 1)
+            anchor["mark"]["mkmk"]["x"] -= (origin_x + min_x - 1)
 
     glyph["glyph_order"].append(glyph_name)
-    glyph["glyphs"][glyph_name] = pen.glyph()
-    glyph["metrics"][glyph_name] = (advance, lsb)
     glyph["cmap"][codepoint] = glyph_name
     return 1
 
@@ -230,21 +286,35 @@ def export(typeface, profile, output):
     print(f"MAX width: {profile["typography"]["maximum-width"] * pixel_size}")
 
     family_name = typeface["info"]["family"]
-    project = load_yaml(project_yml())
+    project = load_yaml(font.project_yml())
     blocks = load_unicode_blocks()
     glyph = prepare_glyphs(units_per_em // 2)  # Defaulting half an em per glyph for .notdef
     built = 0
+
+    anchors_feature: dict = {}
+    kerning_feature: dict = {}
 
     try:
         for block_id in project["blocks"]:
             face = typeface["face"]
 
-            with as_file(project_glyphs(block_id, family_name, face)) as glyph_dir:
+            with as_file(font.project_glyphs(block_id, family_name, face)) as glyph_dir:
                 if not glyph_dir.exists():
                     raise ValueError(
                         f"Glyphs for '{block_id}' with style '{face}' referenced in project.yml "
                         f"does not exist for exporting at: \n'{glyph_dir}'"
                     )
+
+            anchors_yml: Traversable = font.anchors_yml(block_id)
+            kerning_yml: Traversable = font.kerning_yml(block_id)
+
+            def load_anchors():
+                glyph_anchors = parse_glyph_anchors(load_yaml(anchors_yml))
+                anchors_feature[block_id] = glyph_anchors
+                return glyph_anchors
+
+            # Anchors positioning required to adjust each glyph if configured
+            anchors = load_anchors() if anchors_yml.is_file() else None
 
             for pbm in sorted(glyph_dir.glob("glyph_*.pbm")):
                 index = int(pbm.stem.split("_")[1])
@@ -252,12 +322,17 @@ def export(typeface, profile, output):
                 glyph_profile: dict = {
                     "codepoint": codepoint,
                     "pixel_size": pixel_size,
+                    "anchors": anchors,
                     "verbose": v,
                     "typeface": face,
                     "typography": profile["typography"]
                 }
                 log(v, f"Building Glyph index: {index} (U+{codepoint:04X})")
                 built += build_glyph(pbm, glyph, glyph_profile, profile["accent"])
+
+            # Post build: kerning feature is processed purely under OpenType feature
+            if kerning_yml.is_file():
+                kerning_feature[block_id] = kerning_yml
     except Exception as e:
         print(f"{'\033[93m'}{e}{'\033[0m'}", file=sys.stderr)
     if built == 0:
@@ -338,6 +413,39 @@ def export(typeface, profile, output):
         "sampleText": info["sample-text"], # (nameID 19)
     }
 
+    # Prepare .fea feature file as raw text lines
+    fea_full: list[str] = []
+
+    # Collect anchoring features
+    for block_id, anchors in anchors_feature.items():
+        log(v, f"Exporting anchoring feature for: {block_id}")
+        anchor_txt = export_anchor_features(
+            anchors,
+            upm=units_per_em,
+            pixel_size=pixel_size,
+        )
+        log(v, anchor_txt)
+        fea_full.append(anchor_txt)
+
+    # Collect kerning features
+    for block_id, path in kerning_feature.items():
+        log(v, f"Exporting kerning feature for: {block_id}")
+        kerning = load_yaml(path)
+        fea_txt = export_kerning_feat(
+            kerning["groups"],
+            kerning["kerning"],
+            upm=units_per_em,
+            pixel_size=pixel_size,
+        )
+        log(v, fea_txt)
+        fea_full.append("feature kern {")
+        fea_full.append(fea_txt)
+        fea_full.append("} kern;")
+
+    final_features_string = '\n'.join(fea_full)
+
+    fb.addOpenTypeFeatures(final_features_string)
+
     fb.setupNameTable(name_strings)
 
     fb.setupPost(
@@ -359,7 +467,7 @@ def export(typeface, profile, output):
 
 
 def main():
-    config = load_yaml(font_yml())
+    config = load_yaml(font.font_yml())
 
     parser = argparse.ArgumentParser(description='Export a TrueType font from this project')
 

@@ -53,3 +53,11 @@ def project_export(block_name: str, family: str) -> Traversable:
 
 def project_design(block_name: str, family: str) -> Traversable:
     return PROJECT_DIR / block_name / "design" / family
+
+
+def anchors_yml(block_name: str) -> Traversable:
+    return PROJECT_DIR / block_name / "profile" / "anchors.yml"
+
+
+def kerning_yml(block_name: str) -> Traversable:
+    return PROJECT_DIR / block_name / "profile" / "kerning.yml"

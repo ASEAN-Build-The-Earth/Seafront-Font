@@ -49,6 +49,17 @@ profile:
     right-padding: 3
     italic-angle: -12
     monospace-width: 16
+    # Default anchoring positions
+    anchors:
+      base:
+        above: 4
+        below: -4
+      mark:
+        above: 6
+        below: -6
+      mkmk:
+        above: 8
+        below: -8
   # ========================
   # Unit scaling
   # Doesn't affect visually, but internally how each pixel is mapped on a font coordinate
