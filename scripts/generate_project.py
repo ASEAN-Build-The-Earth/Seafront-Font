@@ -60,9 +60,10 @@ def generate(block_name, block):
     start = block["start"]
     end = block["end"]
     count = end - start + 1
+    has_graphic = lambda char: char.isprintable() and not char.isspace()
     fn = lambda i: (
         f"U+{(start + i):04X}",
-        null_cell if ((start + i) < 0x20 or 0x7F <= (start + i) <= 0x9F) else font_cell
+        font_cell if has_graphic(chr(start + i)) else null_cell
     )
     sheet = generate_font_table(fn, count, COLUMN_SIZE, label_font)
 
