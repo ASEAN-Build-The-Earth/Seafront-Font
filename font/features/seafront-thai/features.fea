@@ -10,6 +10,11 @@
 #
 # BTE Seafront Thai OpenType Features
 #
+# References and Portions of these feature definitions
+# are adapted from the notofonts/thai project:
+# https://github.com/notofonts/thai
+#
+# Adapted for this font's glyph naming and implementation:
 # Unicode glyphs: uniXXXX
 # Non-Unicode variants: uniXXXX.suffix
 # Sequence glyphs: uniXXXX.uniYYYY
@@ -17,3 +22,266 @@
 # ============================================================
 
 languagesystem thai dflt;
+
+# Feature: macronbelowcomb (Not Implemented)
+# Prefix: swaps
+# lookup to_macron {
+# sub [saraU-thai saraUu-thai] by macronbelowcomb;
+# } to_macron;
+#
+# lookup to_sarau {
+# sub macronbelowcomb by saraU-thai;
+# } to_sarau;
+#
+# lookup to_sarauu {
+# sub macronbelowcomb by saraUu-thai;
+# } to_sarauu;
+
+# Class: Abovemarks
+#
+# nikhahit_maiEk-thai
+# nikhahit_maiTho-thai
+# nikhahit_maiTri-thai
+# nikhahit_maiChattawa-thai
+#
+# nikhahit_maiEk-thai.narrow
+# nikhahit_maiTho-thai.narrow
+# nikhahit_maiTri-thai.narrow
+# nikhahit_maiChattawa-thai.narrow
+@abovemarks = [
+    uni0E31 uni0E31.narrow
+    uni0E48 uni0E48.small uni0E48.narrow
+    uni0E49 uni0E49.small uni0E49.narrow
+    uni0E4A uni0E4A.small uni0E4A.narrow
+    uni0E4B uni0E4B.small uni0E4B.narrow
+    uni0E4C uni0E4C.small uni0E4C.narrow
+    uni0E47 uni0E47.narrow
+    uni0E4E
+    uni0E34 uni0E34.narrow
+    uni0E35 uni0E35.narrow
+    uni0E36 uni0E36.narrow
+    uni0E37 uni0E37.narrow
+    uni0E4D uni0E4D.narrow
+];
+
+# Feature: Alternate glyphs (Not sure if we have anything for this)
+# feature aalt {
+#     feature ccmp;
+# } aalt;
+
+# Feature: Thai-script ccmp lookup table
+feature ccmp {
+
+    # Thai-script decomposition lookup table
+    # We only have one for saraAm = nikhahit + saraAa
+    lookup thai_decomp {
+        script thai;
+        sub uni0E33 by uni0E4D uni0E32;
+    } thai_decomp;
+
+    # Feature: macronbelowcomb for belowmarks
+    # lookup swap_macron_belowmark {
+    #   sub saraU-thai' lookup to_macron macronbelowcomb' lookup to_sarau;
+    #   sub saraUu-thai' lookup to_macron macronbelowcomb' lookup to_sarauu;
+    # } swap_macron_belowmark;
+
+    # Thai-script combination lookup table
+    lookup thai_comb1 {
+        script thai;
+
+        # 1. Base + lower mark -> shortened base
+        # sub [yoYing-thai thoThan-thai doChada-thai toPatak-thai ru-thai lu-thai]' [saraU-thai saraUu-thai phinthu-thai]
+        # by [yoYing-thai.less thoThan-thai.less doChada-thai.short toPatak-thai.short ru-thai.short lu-thai.short];
+        # FULLY SUPPORTED
+        sub [uni0E0D uni0E10 uni0E0E uni0E0F uni0E24 uni0E26]' [uni0E38 uni0E39 uni0E3A]
+        by [uni0E0D.less uni0E10.less uni0E0E.short uni0E0F.short uni0E24.short uni0E26.short];
+
+        # 2. Lower mark gets smaller after a short base
+        # sub [doChada-thai.short toPatak-thai.short ru-thai.short lu-thai.short]
+        #     [phinthu-thai saraU-thai saraUu-thai]'
+        # by [phinthu-thai.small saraU-thai.small saraUu-thai.small];
+        # FULLY SUPPORTED
+        sub [uni0E0E.short uni0E0F.short uni0E24.short uni0E26.short] [uni0E3A uni0E38 uni0E39]'
+        by [uni0E3A.small uni0E38.small uni0E39.small];
+
+        # 3. Above mark becomes .small when another above mark is present
+        # sub [nikhahit-thai nikhahit-thai.narrow maiHanaKat-thai maitaikhu-thai maiEk-thai maiTho-thai maiTri-thai maiChattawa-thai thanthakhat-thai yamakkan-thai saraI-thai saraIi-thai saraUe-thai saraUee-thai maiHanaKat-thai.narrow maitaikhu-thai.narrow saraI-thai.narrow saraIi-thai.narrow saraUe-thai.narrow saraUee-thai.narrow] [maiEk-thai maiTho-thai maiTri-thai maiChattawa-thai thanthakhat-thai]'
+        # by [maiEk-thai.small maiTho-thai.small maiTri-thai.small maiChattawa-thai.small thanthakhat-thai.small];
+        # FULLY SUPPORTED
+        sub [uni0E4D uni0E4D.narrow
+             uni0E31 uni0E31.narrow
+             uni0E47 uni0E47.narrow
+             uni0E34 uni0E34.narrow
+             uni0E35 uni0E35.narrow
+             uni0E36 uni0E36.narrow
+             uni0E37 uni0E37.narrow
+             uni0E48 uni0E49 uni0E4A uni0E4B uni0E4C uni0E4E]
+            [uni0E47 uni0E48 uni0E49 uni0E4A uni0E4B uni0E4C]'
+        by [uni0E47.small uni0E48.small uni0E49.small uni0E4A.small uni0E4B.small uni0E4C.small];
+
+        # 4. Certain bases need narrower marks
+        # sub [poPla-thai foFa-thai foFan-thai]
+        #     [maiHanaKat-thai thanthakhat-thai nikhahit-thai maiEk-thai
+        #     maiTho-thai maiTri-thai maiChattawa-thai maitaikhu-thai
+        #     saraI-thai saraIi-thai saraUe-thai saraUee-thai]'
+        # by [maiHanaKat-thai.narrow thanthakhat-thai.narrow nikhahit-thai.narrow maiEk-thai.narrow
+        #     maiTho-thai.narrow maiTri-thai.narrow maiChattawa-thai.narrow maitaikhu-thai.narrow
+        #     saraI-thai.narrow saraIi-thai.narrow saraUe-thai.narrow saraUee-thai.narrow];
+        # FULLY SUPPORTED
+        # ADDED choChang(uni0E0A) soSo(uni0E0B) soSala(uni0E28) soSua(uni0E2A) hoNokhuk(uni0E2E)
+        sub [uni0E1B uni0E1F uni0E1D uni0E0A uni0E0B uni0E28 uni0E2A uni0E2E]
+            [uni0E31 uni0E4C uni0E4D uni0E48
+            uni0E49 uni0E4A uni0E4B uni0E47
+            uni0E34 uni0E35 uni0E36 uni0E37]'
+        by [uni0E31.narrow uni0E4C.narrow uni0E4D.narrow uni0E48.narrow
+            uni0E49.narrow uni0E4A.narrow uni0E4B.narrow uni0E47.narrow
+            uni0E34.narrow uni0E35.narrow uni0E36.narrow uni0E37.narrow];
+
+        # 5. Combined nikhahit + tone mark variants
+        # NOT IMPLEMENTED
+        # sub [poPla-thai foFa-thai foFan-thai]
+        #     [nikhahit_maiEk-thai nikhahit_maiTho-thai nikhahit_maiTri-thai nikhahit_maiChattawa-thai]'
+        # by [nikhahit_maiEk-thai.narrow nikhahit_maiTho-thai.narrow nikhahit_maiTri-thai.narrow nikhahit_maiChattawa-thai.narrow];
+
+        # 6. Tone mark after low vowel -> narrow tone mark
+        # sub [maiEk-thai.narrow maiTho-thai.narrow maiTri-thai.narrow maiChattawa-thai.narrow thanthakhat-thai.narrow]
+        #     [maiEk-thai maiTho-thai maiTri-thai maiChattawa-thai thanthakhat-thai]'
+        # by [maiEk-thai.small maiTho-thai.small maiTri-thai.small maiChattawa-thai.small thanthakhat-thai.small];
+        # FULLY SUPPORTED
+        sub [uni0E47.narrow uni0E48.narrow uni0E49.narrow uni0E4A.narrow uni0E4B.narrow uni0E4C.narrow]
+            [uni0E47 uni0E48 uni0E49 uni0E4A uni0E4B uni0E4C]'
+        by [uni0E47.small uni0E48.small uni0E49.small uni0E4A.small uni0E4B.small uni0E4C.small];
+
+        # 7. Base + lower mark + tone mark -> narrow tone mark
+        # sub [poPla-thai foFa-thai foFan-thai]
+        #    [saraU-thai saraUu-thai phinthu-thai]
+        #    [maiEk-thai maiTho-thai maiTri-thai maiChattawa-thai thanthakhat-thai]'
+        # by [maiEk-thai.narrow maiTho-thai.narrow maiTri-thai.narrow maiChattawa-thai.narrow thanthakhat-thai.narrow];
+        # FULLY SUPPORTED
+        sub [uni0E1B uni0E1F uni0E1E]
+           [uni0E38 uni0E39 uni0E3A]
+           [uni0E48 uni0E49 uni0E4A uni0E4B uni0E4C]'
+        by [uni0E48.narrow uni0E49.narrow uni0E4A.narrow uni0E4B.narrow uni0E4C.narrow];
+
+        # 8. Narrow mark + normal mark -> preserve/narrow the second mark
+        # sub [maiHanaKat-thai.narrow maitaikhu-thai.narrow saraI-thai.narrow saraIi-thai.narrow saraUe-thai.narrow saraUee-thai.narrow]
+        #     [maiHanaKat-thai maitaikhu-thai saraI-thai saraIi-thai saraUe-thai saraUee-thai]'
+        # by [maiHanaKat-thai.narrow maitaikhu-thai.narrow saraI-thai.narrow saraIi-thai.narrow saraUe-thai.narrow saraUee-thai.narrow];
+        # FULLY SUPPORTED
+        sub [uni0E31.narrow uni0E47.narrow uni0E34.narrow uni0E35.narrow uni0E36.narrow uni0E37.narrow]
+           [uni0E31 uni0E47 uni0E34 uni0E35 uni0E36 uni0E37]'
+        by [uni0E31.narrow uni0E47.narrow uni0E34.narrow uni0E35.narrow uni0E36.narrow uni0E37.narrow];
+
+        # 9. Macron exception cases
+        # NOT IMPLEMENTED
+        # sub [yoYing-thai choChoe-thai thoPhuthao-thai noNen-thai] macronbelowcomb' by macronbelowcomb.alt;
+
+    } thai_comb1;
+
+    # yoYing with macronbelowcomb
+    # NOT IMPLEMENTED
+    # lookup yo_macron {
+    #   lookupflag UseMarkFilteringSet [macronbelowcomb.alt];
+    #   sub yoYing-thai' macronbelowcomb.alt by yoYing-thai.less;
+    # } yo_macron;
+
+    # Subtitute loChula with @abovemarks with the short variant
+    # lookup short_lo {
+    #   lookupflag UseMarkFilteringSet @abovemarks;
+    #   sub loChula-thai' [nikhahit-thai maiChattawa-thai maiEk-thai maiHanaKat-thai thanthakhat-thai maiTho-thai maiTri-thai maitaikhu-thai yamakkan-thai saraI-thai saraIi-thai saraUe-thai saraUee-thai]
+    #   by loChula-thai.short;
+    # } short_lo;
+    # FULLY SUPPORTED
+    lookup short_lo {
+        lookupflag UseMarkFilteringSet @abovemarks;
+        sub uni0E2C' [uni0E4D uni0E4B uni0E48 uni0E31 uni0E4C uni0E49 uni0E4A uni0E47 uni0E4E uni0E34 uni0E35 uni0E36 uni0E37]
+        by uni0E2C.short;
+    } short_lo;
+
+} ccmp;
+
+# Feature: Lu Ru + lakkhangyao combination
+# feature liga {
+# # automatic
+# sub lu-thai lakkhangyao-thai by lu_lakkhangyao-thai;
+# sub ru-thai lakkhangyao-thai by ru_lakkhangyao-thai;
+# } liga;
+# FULLY SUPPORTED
+feature liga {
+    sub uni0E26 uni0E45 by uni0E26.uni0E45;
+    sub uni0E24 uni0E45 by uni0E24.uni0E45;
+} liga;
+
+# Feature: Tailless tho than / yo ying
+# feature ss01 {
+#   featureNames {
+#         name "Tailless tho than / yo ying";
+#         name 1 "Tailless tho than / yo ying";
+#   };
+#   sub thoThan-thai by thoThan-thai.less;
+#   sub yoYing-thai by yoYing-thai.less;
+# } ss01;
+# FULLY SUPPORTED
+feature ss01 {
+    featureNames {
+        name "Tailless tho than / yo ying";
+        name 1 "Tailless tho than / yo ying";
+    };
+    sub uni0E10 by uni0E10.less;
+    sub uni0E0D by uni0E0D.less;
+} ss01;
+
+feature ss02 {
+    featureNames {
+        name "Historical Thai Fongman Fannu";
+        name 1 "Historical Thai Fongman Fannu";
+    };
+    sub uni0E4F by uni0E4F.alt;
+} ss02;
+
+# GDEF Glyph table
+# Note: that we should consider adding U+25CC (dotted circle)
+# to base glyphs as to show single character above marks
+# table GDEF {
+#     GlyphClassDef
+#         [ ...base glyphs... ],
+#         [ uni0E24.uni0E45 uni0E26.uni0E45 ... ], # ligatures
+#         [ ...mark glyphs... ],
+#         ;
+# } GDEF;
+
+table GDEF {
+    GlyphClassDef
+        [ uni0E01 uni0E02 uni0E03 uni0E04 uni0E05 uni0E06
+        uni0E07 uni0E08 uni0E09 uni0E0A uni0E0B uni0E0C
+        uni0E0D uni0E0D.less uni0E0E uni0E0E.short uni0E0F
+        uni0E0F.short uni0E10 uni0E10.less uni0E11 uni0E12
+        uni0E13 uni0E14 uni0E15 uni0E16 uni0E17 uni0E18
+        uni0E19 uni0E1A uni0E1B uni0E1C uni0E1D uni0E1E
+        uni0E1F uni0E20 uni0E21 uni0E22 uni0E23 uni0E24
+        uni0E24.short uni0E25 uni0E26
+        uni0E26.short uni0E27 uni0E28 uni0E29 uni0E2A uni0E2B
+        uni0E2C uni0E2C.short uni0E2D uni0E2E uni0E2F uni0E30 uni0E32 uni0E33
+        uni0E3F uni0E40 uni0E41 uni0E42 uni0E43 uni0E44 uni0E45
+        uni0E46 uni0E4F uni0E4F.alt uni0E50
+        uni0E51 uni0E52 uni0E53 uni0E54 uni0E55 uni0E56 uni0E57 uni0E58
+        uni0E59 uni0E5A uni0E5B ],
+        [ uni0E24.uni0E45 uni0E26.uni0E45 ],
+        [ uni0E31 uni0E31.narrow
+        uni0E34 uni0E34.narrow
+        uni0E35 uni0E35.narrow
+        uni0E36 uni0E36.narrow
+        uni0E37 uni0E37.narrow
+        uni0E38 uni0E38.small
+        uni0E39 uni0E39.small
+        uni0E3A uni0E3A.small
+        uni0E47 uni0E47.narrow uni0E47.small
+        uni0E48 uni0E48.small uni0E48.narrow
+        uni0E49 uni0E49.small uni0E49.narrow
+        uni0E4A uni0E4A.small uni0E4A.narrow
+        uni0E4B uni0E4B.small uni0E4B.narrow
+        uni0E4C uni0E4C.small uni0E4C.narrow
+        uni0E4D uni0E4D.narrow
+        uni0E4E ],
+        ;
+} GDEF;
