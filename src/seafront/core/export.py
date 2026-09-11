@@ -14,6 +14,7 @@ from importlib.resources.abc import Traversable
 
 from sys import stderr
 from .glyphs import build_glyph
+from ..font import FONT_DIR
 from ..unicode import load_unicode_blocks
 from ..model.glyphs import prepare_glyphs
 from ..model.anchors import parse_glyph_anchors
@@ -231,6 +232,19 @@ def export(font_export, profile, export_fn):
 
     # Prepare .fea feature file as raw text lines
     fea_full: list[str] = []
+    afdko_parent = FONT_DIR / font_export["features-afdko"]["parent-afdko"]
+
+    if afdko_parent.is_file():
+        print(f"Exporting parent features file (AFDKO) for: {afdko_parent}")
+        includes: list[str] = font_export["features-afdko"]["includes-fea"]
+        features: str = afdko_parent.read_text()
+        fea_full.append(features)
+
+        # Include font specific features file
+        for fea_path in includes:
+            with as_file(FONT_DIR / fea_path) as fea_include_path:
+                fea_full.append(f"include({fea_include_path})")
+        fea_full.append("")
 
     # Collect anchoring features
     for block_id, anchors in anchors_feature.items():

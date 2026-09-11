@@ -12,6 +12,10 @@ font:
       With contributions from the BuildTheEarth Community
     unicode-blocks:
       - "Basic Latin"
+    features-afdko:
+      parent-afdko: "features/seafront.fea"
+      includes-fea:
+        - "features/seafront/features.fea"
     sample-text: |
       The quick brown fox jumps over the lazy dog.
       0 1 2 3 4 5 6 7 8 9 
@@ -29,6 +33,10 @@ font:
     unicode-blocks:
       - "Basic Latin"
       - "Thai"
+    features-afdko:
+      parent-afdko: "features/seafront-thai.fea"
+      includes-fea:
+        - "features/seafront-thai/features.fea"
     sample-text: "\u0E01\u0E02\u0E03\u0E04\u0E05\u0E06\u0E07\u0E08\u0E09"
 # ========================
 # Typeface Metadata
