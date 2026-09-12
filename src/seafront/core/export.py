@@ -55,31 +55,28 @@ def export(font_export, profile, export_fn):
 
     anchors_feature: dict = {}
     kerning_feature: dict = {}
+    unicode_missing: tuple | None = None
 
     try:
-        for block_id in font_export["unicode-blocks"]:
+        for block_name in font_export["unicode-blocks"]:
             face = font_export["face"]
 
-            with as_file(font.project_glyphs(block_id, family_name, face)) as glyph_dir:
+            with as_file(font.project_glyphs(block_name, family_name, face)) as glyph_dir:
                 if not glyph_dir.exists():
-                    error = (
-                        f"Glyphs for '{block_id}' with style '{face}' referenced in project.yml "
-                        f"does not exist for exporting at: \n'{glyph_dir}'"
-                    )
-                    print(f"{'\033[93m'}{error}{'\033[0m'}", file=stderr)
+                    unicode_missing = (block_name, glyph_dir)
                     continue
 
-            anchors_yml: Traversable = font.anchors_yml(block_id)
-            kerning_yml: Traversable = font.kerning_yml(block_id)
+            anchors_yml: Traversable = font.anchors_yml(block_name)
+            kerning_yml: Traversable = font.kerning_yml(block_name)
 
             def load_anchors():
                 glyph_anchors = parse_glyph_anchors(load_yaml(anchors_yml))
-                anchors_feature[block_id] = glyph_anchors
+                anchors_feature[block_name] = glyph_anchors
                 return glyph_anchors
 
             # Kerning feature is processed purely under OpenType feature
             if kerning_yml.is_file():
-                kerning_feature[block_id] = kerning_yml
+                kerning_feature[block_name] = kerning_yml
 
             # Anchors positioning required to adjust each glyph if configured
             anchors = load_anchors() if anchors_yml.is_file() else None
@@ -93,22 +90,22 @@ def export(font_export, profile, export_fn):
 
             for pbm in sorted(glyph_dir.glob("glyph_*.pbm")):
                 index = int(pbm.stem.split("_")[1])
-                codepoint: dict = { "codepoint": int(blocks[block_id]["start"]) + (index - 1) }
+                codepoint: dict = { "codepoint": int(blocks[block_name]["start"]) + (index - 1) }
                 log(v, f"Building Glyph index: {index} (U+{codepoint["codepoint"]:04X})")
                 built += build_glyph(pbm, glyph, codepoint | glyph_profile, profile["accent"])
 
             # Check if extra features exist as glyphs config
-            feat_glyphs = font.ext_glyphs_yml(block_id)
+            feat_glyphs = font.ext_glyphs_yml(block_name)
 
             if feat_glyphs.is_file():
                 ext_glyph_yml = load_yaml(feat_glyphs)
-                with as_file(font.project_glyphs(block_id, family_name, f"ext-{face}")) as ext_glyph_dir:
+                with as_file(font.project_glyphs(block_name, family_name, f"ext-{face}")) as ext_glyph_dir:
                     if not ext_glyph_dir.exists():
-                        error = (
-                            f"Extra glyphs for '{block_id}' required in profile/ext-glyphs.yml "
+                        glyph_error = (
+                            f"Extra glyphs for '{block_name}' required in profile/ext-glyphs.yml "
                             f"does not exist for exporting at: \n'{ext_glyph_dir.name}'"
                         )
-                        print(f"{'\033[93m'}{error}{'\033[0m'}", file=stderr)
+                        print(f"{'\033[93m'}{glyph_error}{'\033[0m'}", file=stderr)
                         continue
 
                 # Extra glyphs has user defined name
@@ -123,11 +120,11 @@ def export(font_export, profile, export_fn):
                     index = int(pbm.stem.split("_")[1]) - 1
                     ext_glyph = fn_ext_glyph_at(index)
                     if not ext_glyph:
-                        error = (
+                        glyph_error = (
                             f"No definition found for Extra glyph at:\n{pbm}\n"
                             f"Expected key required in ext-glyph.yml: 'ext-{index:02X}': "
                         )
-                        print(f"{'\033[93m'}{error}{'\033[0m'}", file=stderr)
+                        print(f"{'\033[93m'}{glyph_error}{'\033[0m'}", file=stderr)
                         continue
 
                     ext_profile: dict = {
@@ -138,7 +135,14 @@ def export(font_export, profile, export_fn):
                     built += build_glyph(pbm, glyph, glyph_profile | ext_profile, profile["accent"])
     except Exception as e:
         print(f"{'\033[93m'}Exception when collecting glyphs:\n{e}{'\033[0m'}", file=stderr)
-    if built == 0:
+    if unicode_missing is not None:
+        (missing_name, missing_dir) = unicode_missing
+        error_details = (f"\n  required for '{family_name}' with '{font_export["face"]}' typeface at: "
+                         f"\n  {missing_dir}"
+                         f"\n  (font/font.yml font.{font_export["name"]}.unicode-blocks)")
+        raise ValueError(f"{font_export["name"]} Missing required Unicode block"
+                         f" '{missing_name}'" + error_details)
+    elif built == 0:
         raise ValueError("No available glyphs found for this typeface.")
 
     # ------------------------------
@@ -247,8 +251,8 @@ def export(font_export, profile, export_fn):
         fea_full.append("")
 
     # Collect anchoring features
-    for block_id, anchors in anchors_feature.items():
-        log(v, f"Exporting anchoring feature for: {block_id}")
+    for block_name, anchors in anchors_feature.items():
+        log(v, f"Exporting anchoring feature for: {block_name}")
         anchor_txt = export_anchor_features(
             anchors,
             upm=units_per_em,
@@ -258,8 +262,8 @@ def export(font_export, profile, export_fn):
         fea_full.append(anchor_txt)
 
     # Collect kerning features
-    for block_id, path in kerning_feature.items():
-        log(v, f"Exporting kerning feature for: {block_id}")
+    for block_name, path in kerning_feature.items():
+        log(v, f"Exporting kerning feature for: {block_name}")
         kerning = load_yaml(path)
         fea_txt = export_kerning_feat(
             kerning["groups"],
