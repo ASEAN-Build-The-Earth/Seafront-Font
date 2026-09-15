@@ -9,11 +9,17 @@
 Glyph exporting implementation
 """
 from pathlib import Path
+from typing import Literal
+
 from PIL import Image
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from .extract import extract, chain, simplify, Edge
 
 from sys import stderr
+
+from ..model.anchors import GlyphsPositioning, AnchorPositioning
+from ..model.font import TypefaceAccent, DefaultAnchors
+from ..model.glyphs import GlyphsTable, GlyphMetric, GlyphProfile
 
 
 def log(verbose=False, *args):
@@ -42,28 +48,32 @@ def draw_glyphs(pen: TTGlyphPen, paths: list[list[Edge]]):
         draw_glyph(simplified)
 
 
-
 def build_glyph(pbm: Path,
-                glyph: dict,
-                profile,
-                accent) -> int:
+                glyph: GlyphsTable,
+                profile: GlyphProfile,
+                *,
+                name: str | None=None,
+                cmap: int | None=None) -> Literal[0, 1]:
     """
+    Read pbm bitmaps, extract it as glyphs, and compile all information in glyphs table.
 
     :param pbm: Path to the glyph's bitmap to build
-    :param glyph:
-    :param profile:
-    :param accent:
+    :param glyph: Glyphs table where result will be updated into it
+    :param profile: The profile of this glyph to build
+    :param cmap: Unicode codepoint integer if this glyph belongs in the Unicode table
+    :param name: The name of this glyph, uses uniXXXX prefix: :code:`uni{cmap:04X}`
     :return: 1 if the glyph is successfully built in to dictionary, else 0
     """
     v: bool = profile["verbose"]
-    codepoint: int = profile["codepoint"]
     pixel_size: int = profile["pixel_size"]
     white_space: int = profile["typography"]["white-space"]  # The white-space width
     right_padding: int = profile["typography"]["right-padding"]  # The padding between every character
 
     # PBM Cell: The dimension of glyph pbm file
-    # TODO: currently is coded to reflect each font's designed accent
-    # TODO: might consider making this more dynamic
+    # TODO: currently is coded to reflect each font's designed accent,
+    #       might consider making this more dynamic.
+    #       For example if we want to optimize some pbm file like cropping.
+    accent: TypefaceAccent = profile["accent"]
     pbm_cell: int = accent["ascender"] + accent["descender"]
 
     origin_x: int = pbm_cell - profile["typography"]["maximum-width"]
@@ -84,15 +94,15 @@ def build_glyph(pbm: Path,
     is_extension: bool = False
 
     # Check for codepoint identity
-    if isinstance(codepoint, int):
-        if "glyph_name" in profile:
+    if isinstance(cmap, int):
+        if name is not None:
             is_extension = True
-            glyph_name = profile["glyph_name"]
+            glyph_name = name
         else:
-            glyph_name = f"uni{codepoint:04X}"
+            glyph_name = f"uni{cmap:04X}"
     else:
         # Else, glyph name must be specified
-        if "glyph_name" not in profile:
+        if name is None:
             print(
                 f"{'\033[93m'}Non-unicode glyph for:\n{pbm}"
                 f"\n require name to be set in its profile{'\033[0m'}",
@@ -100,39 +110,36 @@ def build_glyph(pbm: Path,
             )
             return 0
         is_extension = True
-        glyph_name = profile["glyph_name"]
+        glyph_name = name
 
-    # Special case for space character (U+0020)
+    # Special case for white-space character (U+0020)
     # TODO: Maybe a specific function for this?
-    if not is_extension and codepoint == 0x0020:
-        log(v, f"Writing whitespace U+{codepoint:04X} as {white_space}px")
+    #       if we have more special characters.
+    if not is_extension and cmap == 0x0020:
+        log(v, f"Writing whitespace U+{cmap:04X} as {white_space}px")
         pen = TTGlyphPen(None)
 
         glyph["glyphs"][glyph_name] = pen.glyph()  # Empty glyph
-        glyph["metrics"][glyph_name] = (white_space * pixel_size, 0)
+        glyph["metrics"][glyph_name] = GlyphMetric(adv=white_space * pixel_size, lsb=0)
         glyph["glyph_order"].append(glyph_name)
-        glyph["cmap"][codepoint] = glyph_name
+        glyph["cmap"][cmap] = glyph_name
         return 1
 
-        # Glyph's positional profile
+    # Glyph's positional profile
     y_anchor: int = 0
     x_anchor: int = 0
-    anchor: dict | None = None
-    anchor_type: str | None = None
-    options = dict(base="base", above="mark", below="mark")
-
-    if isinstance(profile["anchors"], dict):
-        anchors = profile["anchors"]
-
+    anchor: AnchorPositioning | None = None
+    default_anchors: DefaultAnchors = profile["typography"]["anchors"]
+    profile_anchors: dict[str, GlyphsPositioning] | None = profile["anchors"]
+    if isinstance(profile_anchors, dict):
         # If this glyph has anchor configuration
-        if glyph_name in anchors:
-            positioning = anchors[glyph_name]
+        if glyph_name in profile_anchors:
+            positioning: GlyphsPositioning = profile_anchors[glyph_name]
             anchor = positioning["anchor"]
             glyph_class = positioning["anchor"]["type"]
-            anchor_type = options[glyph_class]
 
-            if anchor_type == "mark":
-                y_anchor += profile["typography"]["anchors"]["mark"][glyph_class]
+            if glyph_class == "above" or glyph_class == "below":
+                y_anchor += default_anchors["mark"][glyph_class]
 
             x_anchor += int(positioning["pos"]["x"])
             y_anchor += int(positioning["pos"]["y"])
@@ -187,15 +194,9 @@ def build_glyph(pbm: Path,
 
     glyph["glyphs"][glyph_name] = pen.glyph()
 
-    if not anchor_type == "mark":
-        glyph["metrics"][glyph_name] = (advance, lsb)
-    else:
-        # Mark classes required to be zero width as
-        # it would position vertically from left side character
-        glyph["metrics"][glyph_name] = (0, lsb - advance)
-
     if anchor is not None:
-        if not anchor_type == "mark":
+        mark_class = anchor["type"]
+        if mark_class == "base":
             # Default anchor will be positioned right-most of the glyph
             anchor["base"]["below"]["x"] += advance_width
             anchor["base"]["above"]["x"] += advance_width
@@ -203,18 +204,24 @@ def build_glyph(pbm: Path,
             # With 2 anchor: below at y=0, and above at x-height
             anchor["base"]["above"]["y"] += profile["typography"]["x-height"]
         else:
-            # Above-marks need to shift the anchor up to its y position
-            if anchor["type"] == "above":
-                anchor["mark"]["base"]["y"] += (max_y - 1) + profile["typography"]["anchors"]["mark"][anchor["type"]]
-                anchor["mark"]["mkmk"]["y"] += (max_y - 1) + profile["typography"]["anchors"]["mark"][anchor["type"]]
+            glyph["metrics"][glyph_name] = GlyphMetric.as_marks(adv=advance, lsb=lsb)
 
-            anchor["mark"]["mkmk"]["y"] += profile["typography"]["anchors"]["mkmk"][anchor["type"]]
+            # Above-marks need to shift the anchor up to its y position
+            if mark_class == "above":
+                anchor["mark"]["base"]["y"] += (max_y - 1) + default_anchors["mark"][mark_class]
+                anchor["mark"]["mkmk"]["y"] += (max_y - 1) + default_anchors["mark"][mark_class]
+
+            anchor["mark"]["mkmk"]["y"] += default_anchors["mkmk"][mark_class]
 
             # This one follow the metrics' x position
             # anchor["mark"]["base"]["x"] -= (origin_x + min_x - 1 - x_anchor)
             anchor["mark"]["base"]["x"] -= (origin_x + min_x - 1)
             anchor["mark"]["mkmk"]["x"] -= (origin_x + min_x - 1)
 
+    if glyph_name not in glyph["metrics"]:
+        glyph["metrics"][glyph_name] = GlyphMetric(adv=advance, lsb=lsb)
+
+    inserted: bool = False
     if is_extension:
         unicode_name = glyph_name.split('.')[0]
         try:
@@ -226,12 +233,12 @@ def build_glyph(pbm: Path,
                 print(f"\033[93m{error}\033[0m", file=stderr)
 
             glyph["glyph_order"].insert(target_index + 1, glyph_name)
+            inserted = True
         except ValueError:
-            glyph["glyph_order"].append(glyph_name)
-    else:
+            pass
+    if not inserted:
         glyph["glyph_order"].append(glyph_name)
 
-    if isinstance(codepoint, int):
-        glyph["cmap"][codepoint] = glyph_name
-        
+    if isinstance(cmap, int):
+        glyph["cmap"][cmap] = glyph_name
     return 1

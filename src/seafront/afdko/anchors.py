@@ -8,9 +8,12 @@
 """\
 Anchoring helpers
 """
+from seafront.model.anchors import GlyphsPositioning, Pixel, AnchorPositioning, AnchorClass
+from seafront.model.font import MarkClass
+
 
 def export_anchor_features(
-    glyphs,
+    glyphs: dict[str, GlyphsPositioning],
     *, upm: int, pixel_size: int
 ) -> str:
     """
@@ -22,14 +25,14 @@ def export_anchor_features(
     :return: AFDKO feature file text block
     """
     lines: list[str] = []
-    units_per_pixel = upm / pixel_size
-    # TODO: This would make duplicate name for more than 1 feature
-    mark_classes = {
+    units_per_pixel: float | int = upm / pixel_size
+    # FIXME: This would make duplicate name for more than 1 feature
+    mark_classes: dict[MarkClass, str] = {
         "above": "@Anchor_AboveMarks",
         "below": "@Anchor_BelowMarks",
     }
 
-    def pack(pixel) -> str:
+    def pack(pixel: Pixel) -> str:
         x: int = round(pixel["x"] * units_per_pixel)
         y: int = round(pixel["y"] * units_per_pixel)
         return f"{x} {y}"
@@ -37,15 +40,15 @@ def export_anchor_features(
     # markClass declarations
     lines.append("")
     for glyph_name, positioning in glyphs.items():
-        anchor = positioning["anchor"]
-        anchor_type = anchor["type"]
+        anchor: AnchorPositioning = positioning["anchor"]
+        anchor_type: AnchorClass = anchor["type"]
 
         if anchor_type not in ("above", "below"):
             continue
 
         # Anchor used when this mark attaches to a base.
-        mark_class = mark_classes[anchor_type]
-        mark = anchor["mark"]["base"]
+        mark_class: str = mark_classes[anchor_type]
+        mark: Pixel = anchor["mark"]["base"]
         lines.append(f"markClass {glyph_name} <anchor {pack(mark)}> {mark_class};")
 
     # Base to mark anchoring
@@ -53,20 +56,20 @@ def export_anchor_features(
     lines.append("feature mark {")
 
     for glyph_name, positioning in glyphs.items():
-        anchor = positioning["anchor"]
+        anchor: AnchorPositioning = positioning["anchor"]
 
         if anchor["type"] != "base":
             continue
 
-        base = anchor["base"]
+        base: dict[MarkClass, Pixel] = anchor["base"]
         rules: list[str] = []
 
         for mark_type in ("above", "below"):
             if mark_type not in base:
                 continue
 
-            position = base[mark_type]
-            mark_class = mark_classes[mark_type]
+            position: Pixel = base[mark_type]
+            mark_class: str = mark_classes[mark_type]
 
             rules.append(f"<anchor {pack(position)}> mark {mark_class}")
 
@@ -80,13 +83,13 @@ def export_anchor_features(
     lines.append("feature mkmk {")
 
     for glyph_name, positioning in glyphs.items():
-        anchor = positioning["anchor"]
-        anchor_type = anchor["type"]
+        anchor: AnchorPositioning = positioning["anchor"]
+        anchor_type: AnchorClass = anchor["type"]
 
         if anchor_type not in ("above", "below"):
             continue
 
-        mkmk = anchor["mark"]["mkmk"]
+        mkmk: Pixel = anchor["mark"]["mkmk"]
 
         if mkmk["x"] == 0 and mkmk["y"] == 0:
             continue

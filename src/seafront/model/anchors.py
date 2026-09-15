@@ -8,8 +8,51 @@
 """\
 Anchoring data model
 """
+from sys import stderr
+from typing import TypedDict
+from seafront.model.font import BaseLabel, MarkClass, BaseClass, MarkLabel
 
-def parse_glyph_anchors(anchors_yml: dict):
+# Glyph classes string Literals
+AnchorClass = BaseLabel | MarkClass
+
+# Class dictionary
+Pixel = TypedDict("Pixel", { "x": int, "y": int })
+MarkAnchor = dict[BaseClass, Pixel]
+BaseAnchor = dict[MarkClass, Pixel]
+
+
+class AnchorPositioning(TypedDict):
+    """
+    Glyph anchoring data type
+
+    :ivar type: The anchor class of this glyph
+    :ivar mark: Anchors for glyph of mark class (above/below)
+    :ivar base: Anchors for glyph of base class
+    """
+    type: AnchorClass
+    mark: MarkAnchor
+    base: BaseAnchor
+
+
+class GlyphsPositioning(TypedDict):
+    """
+    Glyph positioning data type
+
+    :ivar anchor: The anchors class of this glyph
+    :ivar pos: The glyph position (additive) in font metrics
+    """
+    anchor: AnchorPositioning
+    pos: Pixel
+
+
+GlyphAnchors = dict[str, GlyphsPositioning]
+"""
+Glyphs anchoring data model, 
+maps each glyph name to its positioning data.
+"""
+
+
+def parse_glyph_anchors(anchors_yml: dict) -> GlyphAnchors:
     """
     Parse Unicode block's profile/anchors.yml
 
@@ -18,13 +61,13 @@ def parse_glyph_anchors(anchors_yml: dict):
     :raises TypeError: If the configuration is invalid.
     """
 
-    mark_class = { "above", "below" }
-    result = {}
+    mark_class: set[MarkClass] = {"above", "below"}
+    result: dict[str, GlyphsPositioning] = {}
 
-    def zero():
+    def zero() -> Pixel:
         return { "x": 0, "y": 0 }
 
-    def parse_position(pos):
+    def parse_position(pos: Pixel | dict | list | None) -> Pixel:
         # Parse (Optional) position
         if isinstance(pos, dict):
             x: int = int( pos.get("x", 0) )
@@ -55,15 +98,21 @@ def parse_glyph_anchors(anchors_yml: dict):
             if isinstance(anchor, str):
                 anchor = { "type": anchor }
             elif not isinstance(anchor, dict):
-                raise TypeError(f"{glyph_name}: anchor must be a string or mapping")
+                print(f"{'\033[93m'}{glyph_name}: anchor must be a string "
+                      f"or mapping{'\033[0m'}", file=stderr)
+                continue
             if not isinstance(metric, dict):
-                raise TypeError(f"{glyph_name}: metric position must be a mapping of x, y")
+                print(f"{'\033[93m'}{glyph_name}: metric position must be "
+                      f"a mapping of x, y{'\033[0m'}", file=stderr)
+                continue
         else:
-            raise TypeError(f"{glyph_name}: expected anchor definition or shorthand")
+            print(f"{'\033[93m'}{glyph_name}: expected anchor definition "
+                  f"or shorthand{'\033[0m'}", file=stderr)
+            continue
 
         # Parse anchor class
-        anchor_type = anchor.get("type")
-        group_tuple = None
+        anchor_type: str | None = anchor.get("type")
+        group_tuple: tuple[AnchorClass, BaseLabel | MarkLabel] | None = None
 
         if anchor_type is not None:
             selected: str = anchor_type.lower()
@@ -75,7 +124,8 @@ def parse_glyph_anchors(anchors_yml: dict):
                     if classes == selected:
                         group_tuple = (classes, "mark")
         if group_tuple is None:
-            raise TypeError(f"{glyph_name}: anchor must specify its type")
+            print(f"{'\033[93m'}{glyph_name}: anchor must specify its type{'\033[0m'}", file=stderr)
+            continue
 
         def create[T](base: set[T], out: str):
             name = anchor.get(out)
@@ -84,11 +134,11 @@ def parse_glyph_anchors(anchors_yml: dict):
                 return { k: parse_position(v) for k, v in mapping.items() }
             return { k: zero() for k in base }
 
-        base_yml = { "above", "below" }
-        mark_yml = { "base", "mkmk"}
+        base_yml: set[MarkClass] = {"above", "below"}
+        mark_yml: set[BaseClass] = {"base", "mkmk"}
         final_class, group = group_tuple
-        base_anchor = create(base_yml, group)
-        mark_anchor = create(mark_yml, group)
+        base_anchor: BaseAnchor = create(base_yml, group)
+        mark_anchor: MarkAnchor = create(mark_yml, group)
 
         result[glyph_name] = {
             "anchor": {
@@ -98,5 +148,4 @@ def parse_glyph_anchors(anchors_yml: dict):
             },
             "pos": parse_position(metric)
         }
-
     return result

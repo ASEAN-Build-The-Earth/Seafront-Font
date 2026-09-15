@@ -21,26 +21,26 @@ using python::
     python export_seafront.py
 """
 from importlib.resources import as_file
-from seafront.font import FONT_DIR
-from seafront.core.export import export
+from seafront.font import font_yml, FONT_DIR
+from seafront.core.export import export, FontExport, FontProfile
+from seafront.model.font import FontYML, TypefaceData, FontMetric, TypefaceStyles, FontInfo, FontData
 
-import seafront.font as font
 import argparse
 import yaml
 
 
 def main():
-    with font.font_yml().open(encoding="utf-8") as io:
-        config = yaml.safe_load(io)
+    with font_yml().open(encoding="utf-8") as io:
+        config: FontYML = yaml.safe_load(io)
 
     parser = argparse.ArgumentParser(
         description="Export a TrueType font from this project",
         formatter_class=argparse.RawTextHelpFormatter
     )
 
-    typeface_options = [*config["typeface"]["style"]]
-    accent_options = [*config["profile"]["accent"]]
-    family_options = config["typeface"]["family"]
+    typeface_options: list[TypefaceStyles] = [*config["typeface"]["style"]]
+    accent_options: list[FontMetric] = [*config["profile"]["accent"]]
+    family_options: list[str] = config["typeface"]["family"]
 
     parser.add_argument('-v', "--verbose",
         default=False, const=True,
@@ -50,8 +50,8 @@ def main():
 
     parser.add_argument('-i', "--identifier",
         nargs="?",
-        type=str,
-        help="The font's version number to export ex. 1.000",
+        type=float,
+        help="The font's version number to export, formatted as 3 decimals float ex. 1.000",
     )
 
     parser.add_argument('-s', "--scale",
@@ -84,7 +84,7 @@ def main():
     )
 
     # Positional Arguments
-    #  export.py {font_options} {output_filename}
+    # export_seafront.py {font_options} {output_filename}
 
     available_font = {k: v["font-desc-info"] for k, v in config["font"].items()}
     font_desc_text = "\n".join(f"- \033[1m\033[32m{key:<8}\033[0m : {val}" for key, val in available_font.items())
@@ -98,14 +98,21 @@ def main():
 
     args = parser.parse_args()
 
-    def get_argument(argument, key, profile=config["profile"]):
-        if argument not in profile[key]:
-            raise ValueError(f"Expected key for '{argument}' in '{key}' not found in config/font.yml")
+    def get_argument[T](argument: T,
+                        key: str,
+                        assertion: TypefaceData | None=None) -> T:
+        if assertion is None:
+            assertion = config["profile"]
+        if argument not in assertion[key]:
+            raise ValueError(f"Expected key for '{argument}' in '{key}' not found in font/font.yml")
         return argument
 
-    def assert_profile(key, profile=config["profile"]):
-        if key not in profile:
-            raise ValueError(f"'{key}' export profile not found in config/font.yml")
+    def assert_profile(key: str,
+                       assertion: TypefaceData | dict[TypefaceStyles, str] | None=None):
+        if assertion is None:
+            assertion = config["profile"]
+        if key not in assertion:
+            raise ValueError(f"'{key}' export profile not found in font/font.yml")
 
     face = get_argument(args.typeface, "style", config["typeface"])
     scale = get_argument(args.scale, "scale")
@@ -118,28 +125,30 @@ def main():
     assert_profile("scale")
     assert_profile("accent")
 
+    font_info: FontInfo = config["typeface"]["info"].copy()
+
     if args.family:
-        config["typeface"]["info"]["family"] = args.family
+        font_info["family"] = args.family
 
     if args.identifier:
-        config["typeface"]["info"]["version"] = f"Version {args.identifier}"
+        font_info["version"] = f"Version {args.identifier:.3f}"
 
-    font_export: dict = {
+    font: FontExport = {
         "style": config["typeface"]["style"][face],
-        "info": config["typeface"]["info"],
+        "info": font_info,
         "name": args.font,
         "face": face
     }
-    font_export |= config["font"][args.font]
-    font_profile: dict = {
+    profile: FontProfile = {
         "typography": config["profile"]["typography"],
         "scale": config["profile"]["scale"][scale],
         "accent": config["profile"]["accent"][accent],
         "verbose": args.verbose
     }
+    data: FontData = config["font"][args.font]
 
     if args.verbose:
-        print("Export Profile: ", font_export, font_profile)
+        print("Export Profile: ", font, profile)
 
     def export_fn(generated_name: str):
         if args.output is None:
@@ -153,7 +162,7 @@ def main():
             export_path.mkdir(exist_ok=True)
             return export_path / filename
 
-    export(font_export, font_profile, export_fn)
+    export(export_fn, font, data, profile)
 
 
 if __name__ == "__main__":

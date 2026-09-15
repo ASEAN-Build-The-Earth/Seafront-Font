@@ -8,22 +8,33 @@
 """\
 Font exporting implementations
 """
+from pathlib import Path
+from typing import TypedDict, Callable
+
 from fontTools.fontBuilder import FontBuilder
-from importlib.resources import as_file, files
+from importlib.resources import as_file
 from importlib.resources.abc import Traversable
 
 from sys import stderr
 from .glyphs import build_glyph
 from ..font import FONT_DIR
-from ..unicode import load_unicode_blocks
-from ..model.glyphs import prepare_glyphs
-from ..model.anchors import parse_glyph_anchors
+from ..unicode import load_unicode_blocks, UnicodeBlock
 from ..afdko.anchors import export_anchor_features
 from ..afdko.kerning import export_kerning_feat
+from ..model.anchors import parse_glyph_anchors, GlyphAnchors
+from ..model.font import TypefaceStyles, FontInfo, FontData, TypographyData, TypefaceAccent
+from ..model.glyphs import (prepare_glyphs,
+                            parse_extra_glyphs,
+                            GlyphsTable,
+                            GlyphProfile,
+                            EXT_PREFIX,
+                            ExtraGlyphsList,
+                            ExtraGlyph)
 
 import seafront.__about__ as about
 import seafront.font as font
 import yaml
+
 
 def log(verbose=False, *args):
     if verbose:
@@ -35,12 +46,52 @@ def load_yaml(file: Traversable):
         return yaml.safe_load(fp)
 
 
-def export(font_export, profile, export_fn):
+class FontExport(TypedDict):
+    """
+    Information of the font to export.
+
+    :ivar style: The style name of this Font
+    :ivar name: The name of this Font
+    :ivar info: Metadata infos
+    :ivar face: The style name identifier
+    """
+    style: str
+    name: str
+    info: FontInfo
+    face: TypefaceStyles
+
+
+class FontProfile(TypedDict):
+    """
+    :ivar verbose: True to verbose printing
+    :ivar scale: Pixel size scaling
+    :ivar accent: Accent size ascender:descender
+    :ivar typography: Typography shared data :class:`TypographyData`
+    """
+    verbose: bool
+    scale: int
+    accent: TypefaceAccent
+    typography: TypographyData
+
+
+def export(export_fn: Callable[[str], Path],
+           font_export: FontExport,
+           font_data: FontData,
+           profile: FontProfile):
+    """
+    Export font as TrueType .ttf file
+
+    :param export_fn: Function to translate (str) generated name into export file Path
+    :param font_export: Font's exporting information
+    :param font_data: Font metadata information
+    :param profile: Typeface profile
+    :return:
+    """
     v: bool = profile["verbose"]
     pixel_size: int = profile["scale"]
-    ascender: int = profile["accent"]["ascender"]  # 35 pixel
-    descender: int = profile["accent"]["descender"]  # 15 pixel
-    units_per_em: int = (ascender + descender) * pixel_size  # 2500
+    ascender: int = profile["accent"]["ascender"]
+    descender: int = profile["accent"]["descender"]
+    units_per_em: int = (ascender + descender) * pixel_size
 
     # Guard UPM, need to fall within ± 4095 for "safety"
     if units_per_em > 4096:
@@ -48,28 +99,28 @@ def export(font_export, profile, export_fn):
               f"Please either lower your scale or step down the accent{'\033[0m'}", file=stderr)
         return
 
-    family_name = font_export["info"]["family"]
-    blocks = load_unicode_blocks()
-    glyph = prepare_glyphs(units_per_em // 2)  # Defaulting half an em per glyph for .notdef
-    built = 0
+    family_name: str = font_export["info"]["family"]
+    blocks: dict[str, UnicodeBlock] = load_unicode_blocks()
+    glyph: GlyphsTable = prepare_glyphs(units_per_em // 2)  # Defaulting half an em per glyph for .notdef
+    built: int = 0
 
-    anchors_feature: dict = {}
-    kerning_feature: dict = {}
-    unicode_missing: tuple | None = None
+    anchors_feature: dict[str, GlyphAnchors] = {}
+    kerning_feature: dict[str, Traversable]  = {}
+    unicode_missing: tuple[str, str] | None  = None
 
     try:
-        for block_name in font_export["unicode-blocks"]:
+        for block_name in font_data["unicode-blocks"]:
             face = font_export["face"]
 
             with as_file(font.project_glyphs(block_name, family_name, face)) as glyph_dir:
                 if not glyph_dir.exists():
-                    unicode_missing = (block_name, glyph_dir)
+                    unicode_missing = (block_name, rf"{glyph_dir}")
                     continue
 
             anchors_yml: Traversable = font.anchors_yml(block_name)
             kerning_yml: Traversable = font.kerning_yml(block_name)
 
-            def load_anchors():
+            def load_anchors() -> GlyphAnchors:
                 glyph_anchors = parse_glyph_anchors(load_yaml(anchors_yml))
                 anchors_feature[block_name] = glyph_anchors
                 return glyph_anchors
@@ -79,46 +130,50 @@ def export(font_export, profile, export_fn):
                 kerning_feature[block_name] = kerning_yml
 
             # Anchors positioning required to adjust each glyph if configured
-            anchors = load_anchors() if anchors_yml.is_file() else None
-            glyph_profile: dict = {
+            anchors: GlyphAnchors | None = load_anchors() if anchors_yml.is_file() else None
+            glyph_profile: GlyphProfile = {
                 "pixel_size": pixel_size,
                 "anchors": anchors,
                 "verbose": v,
                 "typeface": face,
-                "typography": profile["typography"]
+                "typography": profile["typography"],
+                "accent": profile["accent"]
             }
 
             for pbm in sorted(glyph_dir.glob("glyph_*.pbm")):
                 index = int(pbm.stem.split("_")[1])
-                codepoint: dict = { "codepoint": int(blocks[block_name]["start"]) + (index - 1) }
-                log(v, f"Building Glyph index: {index} (U+{codepoint["codepoint"]:04X})")
-                built += build_glyph(pbm, glyph, codepoint | glyph_profile, profile["accent"])
+                codepoint: int = int(blocks[block_name]["start"]) + (index - 1)
+                log(v, f"Building Glyph index: {index} (U+{codepoint:04X})")
+                built += build_glyph(pbm, glyph, glyph_profile, cmap=codepoint)
 
             # Check if extra features exist as glyphs config
             feat_glyphs = font.ext_glyphs_yml(block_name)
 
             if feat_glyphs.is_file():
-                ext_glyph_yml = load_yaml(feat_glyphs)
-                with as_file(font.project_glyphs(block_name, family_name, f"ext-{face}")) as ext_glyph_dir:
+                with as_file(font.project_glyphs(block_name, family_name, f"{EXT_PREFIX}{face}")) as ext_glyph_dir:
                     if not ext_glyph_dir.exists():
                         glyph_error = (
-                            f"Extra glyphs for '{block_name}' required in profile/ext-glyphs.yml "
+                            f"Extra glyphs for '{block_name}' required in profile/{EXT_PREFIX}glyphs.yml "
                             f"does not exist for exporting at: \n'{ext_glyph_dir.name}'"
                         )
                         print(f"{'\033[93m'}{glyph_error}{'\033[0m'}", file=stderr)
                         continue
 
-                # Extra glyphs has user defined name
-                def fn_ext_glyph_at(i) -> dict | None:
-                    key = f"ext-{i:02X}"
-                    if key in ext_glyph_yml["glyphs"]:
-                        return ext_glyph_yml["glyphs"][key]
-                    return None
+                ext_glyph_yaml = load_yaml(feat_glyphs)
+                ext_glyph_list: ExtraGlyphsList = parse_extra_glyphs(ext_glyph_yaml)
 
                 # Add all Extra glyphs
                 for pbm in sorted(ext_glyph_dir.glob("glyph_*.pbm")):
                     index = int(pbm.stem.split("_")[1]) - 1
-                    ext_glyph = fn_ext_glyph_at(index)
+                    if index > len(ext_glyph_list["glyphs"]) - 1:
+                        glyph_error = (
+                            f"No definition found for Extra glyph at:\n{pbm}\n"
+                            f"Expected key required in {EXT_PREFIX}glyph.yml: 'ext-{index:02X}': "
+                        )
+                        print(f"{'\033[93m'}{glyph_error}{'\033[0m'}", file=stderr)
+                        continue
+
+                    ext_glyph: ExtraGlyph = ext_glyph_list["glyphs"][index]
                     if not ext_glyph:
                         glyph_error = (
                             f"No definition found for Extra glyph at:\n{pbm}\n"
@@ -126,13 +181,8 @@ def export(font_export, profile, export_fn):
                         )
                         print(f"{'\033[93m'}{glyph_error}{'\033[0m'}", file=stderr)
                         continue
-
-                    ext_profile: dict = {
-                        "codepoint": ext_glyph["cmap"] if "cmap" in ext_glyph else None,
-                        "glyph_name": ext_glyph["name"] if "name" in ext_glyph else None
-                    }
                     log(v, f"Building Extra Glyph: {index} (EXT-{index:02X})")
-                    built += build_glyph(pbm, glyph, glyph_profile | ext_profile, profile["accent"])
+                    built += build_glyph(pbm, glyph, glyph_profile, name=ext_glyph.name, cmap=ext_glyph.cmap)
     except Exception as e:
         print(f"{'\033[93m'}Exception when collecting glyphs:\n{e}{'\033[0m'}", file=stderr)
     if unicode_missing is not None:
@@ -185,12 +235,13 @@ def export(font_export, profile, export_fn):
     license_desc: list[str] = about.__license__.splitlines()
     license_info: str = license_desc[len(license_desc) - 1]
 
-    info: dict[str, str] = font_export["info"]
+    info: FontInfo = font_export["info"]
     font_naming: list[str] = [family_name]
 
     # Font may have variant name as: Seafront <name>
-    if isinstance(font_export["font-desc-name"], str) and font_export["font-desc-name"]:
-        font_naming.append(font_export["font-desc-name"])
+    descriptor: str | None = font_data.get("font-desc-name")
+    if descriptor is not None and isinstance(descriptor, str):
+        font_naming.append(descriptor)
 
     # The full name without foundry prefix, read as the display name often
     public_name: str = ' '.join(font_naming)
@@ -207,7 +258,12 @@ def export(font_export, profile, export_fn):
     post_script: str = packed_name.replace(' ', '-')
 
     # BTE Seafront <name> Regular Version 1.000
-    font_naming.append(font_export["design-version"])
+    identifier: str | None = font_export["info"].get("version")
+    if identifier is not None and isinstance(identifier, str):
+        font_version = identifier
+    else:
+        font_version = font_data["design-version"]
+    font_naming.append(font_version)
     unique_name: str = ' '.join(font_naming)
 
     name_strings: dict[str, str] = {
@@ -217,11 +273,11 @@ def export(font_export, profile, export_fn):
         "styleName": font_export["style"],  # (nameID 2)
         "uniqueFontIdentifier": unique_name,  # (nameID 3)
         "fullName": packed_name,  # (nameID 4)
-        "version": font_export["design-version"],  # (nameID 5)
+        "version": font_version,  # (nameID 5)
         "psName": post_script,  # (nameID 6)
         # "trademark": "", # (nameID 7)
         "manufacturer": info["manufacturer"],  # (nameID 8)
-        "designer": font_export["design-credits"],  # (nameID 9)
+        "designer": font_data["design-credits"],  # (nameID 9)
         "description": info["description"],  # (nameID 10)
         "vendorURL": info["vendor-url"],  # (nameID 11)
         "designerURL": info["designer-url"],  # (nameID 12)
@@ -231,16 +287,16 @@ def export(font_export, profile, export_fn):
         "typographicFamily": public_name,  # (nameID 16)
         "typographicSubfamily": font_export["style"],  # (nameID 17)
         "compatibleFullName": packed_name,  # (nameID 18)
-        "sampleText": font_export["sample-text"],  # (nameID 19)
+        "sampleText": font_data["sample-text"],  # (nameID 19)
     }
 
     # Prepare .fea feature file as raw text lines
     fea_full: list[str] = []
-    afdko_parent = FONT_DIR / font_export["features-afdko"]["parent-afdko"]
+    afdko_parent = FONT_DIR / font_data["features-afdko"]["parent-afdko"]
 
     if afdko_parent.is_file():
-        print(f"Exporting parent features file (AFDKO) for: {afdko_parent}")
-        includes: list[str] = font_export["features-afdko"]["includes-fea"]
+        log(v, f"Exporting parent features file (AFDKO) for: {afdko_parent.name}")
+        includes: list[str] = font_data["features-afdko"]["includes-fea"]
         features: str = afdko_parent.read_text()
         fea_full.append(features)
 
@@ -251,10 +307,10 @@ def export(font_export, profile, export_fn):
         fea_full.append("")
 
     # Collect anchoring features
-    for block_name, anchors in anchors_feature.items():
+    for block_name, feature in anchors_feature.items():
         log(v, f"Exporting anchoring feature for: {block_name}")
         anchor_txt = export_anchor_features(
-            anchors,
+            feature,
             upm=units_per_em,
             pixel_size=pixel_size,
         )
@@ -262,9 +318,9 @@ def export(font_export, profile, export_fn):
         fea_full.append(anchor_txt)
 
     # Collect kerning features
-    for block_name, path in kerning_feature.items():
+    for block_name, kerning_path in kerning_feature.items():
         log(v, f"Exporting kerning feature for: {block_name}")
-        kerning = load_yaml(path)
+        kerning = load_yaml(kerning_path)
         fea_txt = export_kerning_feat(
             kerning["groups"],
             kerning["kerning"],
@@ -299,4 +355,4 @@ def export(font_export, profile, export_fn):
     export_file = export_fn(post_script)
     fb.save(export_file)
 
-    print(f"Wrote {export_file}")
+    print(f"Wrote: {export_file}")

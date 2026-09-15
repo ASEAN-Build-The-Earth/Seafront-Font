@@ -24,7 +24,11 @@ from importlib.resources import as_file
 from importlib.resources.abc import Traversable
 from PIL import Image
 from PIL import ImageFont
+from PIL.ImageFile import ImageFile
+from os import sep
+
 from seafront.generate import generate_font_table, generate_aseprite_project
+from seafront.model.glyphs import parse_extra_glyphs, get_extra_glyph_label
 from seafront.unicode import load_unicode_blocks
 from seafront.font import (
     project_yml,
@@ -37,9 +41,6 @@ from seafront.font import (
 import yaml
 import argparse
 
-COLUMN_SIZE: int = 16
-"""We will format all font tables by 16 columns and x rows"""
-
 FONT_16: str = "BTE-Seafront-Square-Regular.ttf"
 CELL_64: str = "font-cell-64px.png"
 NULL_64: str = "null-cell-64px.png"
@@ -48,6 +49,11 @@ NULL_64: str = "null-cell-64px.png"
 def load_yaml(file: Traversable):
     with file.open(encoding="utf-8") as fp:
         return yaml.safe_load(fp)
+
+
+def has_graphic(unicode: int) -> bool:
+    char: str = chr(unicode)
+    return char.isprintable() and not char.isspace()
 
 
 def generate(block_name, block):
@@ -63,12 +69,14 @@ def generate(block_name, block):
     start = block["start"]
     end = block["end"]
     count = end - start + 1
-    has_graphic = lambda char: char.isprintable() and not char.isspace()
-    fn = lambda i: (
-        f"U+{(start + i):04X}",
-        font_cell if has_graphic(chr(start + i)) else null_cell
-    )
-    sheet = generate_font_table(fn, count, COLUMN_SIZE, label_font)
+
+    def fn(i: int) -> tuple[str, ImageFile]:
+        code: int = start + i
+        name: str = f"U+{code:04X}"
+        cell = font_cell if has_graphic(code) else null_cell
+        return name, cell
+
+    sheet = generate_font_table(fn, label_font, count)
 
     # TODO: Adapt to new graphics directory
     # graphics = output / "regular.png"
@@ -79,27 +87,30 @@ def generate(block_name, block):
 
     table = project_font_table(block_name)
     exist = "Overwritten" if table.is_file() else "Generated"
-    sheet.save(table)
-    print(f"{exist} '{block_name}'/{table.name}")
+    with as_file(table) as image_file:
+        sheet.save(image_file)
+        print(f"{exist} '{sep}{image_file.relative_to(project_dir.parents[1])}'")
 
     generate_aseprite_project(project, False)
 
     extension: Traversable = ext_glyphs_yml(block_name)
     if extension.is_file():
-        glyphs_yml = load_yaml(extension)
+        glyphs_yml = parse_extra_glyphs(load_yaml(extension))
         columns = glyphs_yml["column"]
         glyphs = glyphs_yml["glyphs"]
-        fn = lambda i: (
-            f"ext-{i:02X}",
-            font_cell if glyphs[f"ext-{i:02X}"]["name"] else null_cell
-        )
+
+        def fn(i: int) -> tuple[str, ImageFile]:
+            cell = null_cell if glyphs[i].is_undefined() else font_cell
+            return get_extra_glyph_label(i), cell
+
         print(f"{len(glyphs)} glyphs Extension feature found for '{block_name}' unicode range")
 
-        sheet = generate_font_table(fn, len(glyphs), columns, label_font)
+        sheet = generate_font_table(fn, label_font, len(glyphs), columns)
         table = project_ext_font_table(block_name)
         exist = "Overwritten" if table.is_file() else "Generated"
-        sheet.save(table)
-        print(f"{exist} Extension '{block_name}'/{table.name}")
+        with as_file(table) as image_file:
+            sheet.save(image_file)
+            print(f"{exist} Extension '{sep}{image_file.relative_to(project_dir.parents[1])}'")
 
         generate_aseprite_project(project, True)
 
