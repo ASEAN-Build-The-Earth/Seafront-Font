@@ -25,7 +25,6 @@ from importlib.resources.abc import Traversable
 from PIL import Image
 from PIL import ImageFont
 from PIL.ImageFile import ImageFile
-from os import sep
 
 from seafront.generate import generate_font_table, generate_aseprite_project
 from seafront.model.glyphs import parse_extra_glyphs, get_extra_glyph_label
@@ -89,7 +88,7 @@ def generate(block_name, block):
     exist = "Overwritten" if table.is_file() else "Generated"
     with as_file(table) as image_file:
         sheet.save(image_file)
-        print(f"{exist} '{sep}{image_file.relative_to(project_dir.parents[1])}'")
+        print(f"{exist} '{image_file.relative_to(project_dir.parents[1])}'")
 
     generate_aseprite_project(project, False)
 
@@ -110,7 +109,7 @@ def generate(block_name, block):
         exist = "Overwritten" if table.is_file() else "Generated"
         with as_file(table) as image_file:
             sheet.save(image_file)
-            print(f"{exist} Extension '{sep}{image_file.relative_to(project_dir.parents[1])}'")
+            print(f"{exist} Extension '{image_file.relative_to(project_dir.parents[1])}'")
 
         generate_aseprite_project(project, True)
 
