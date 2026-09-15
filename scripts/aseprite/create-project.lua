@@ -37,11 +37,12 @@ if not config then
 end
 
 local is_extension = ext and (ext == "True" and true or false) or false
-local extParentPath = is_extension and "/ext-" or "/"
-local fontTablePath = dir .. extParentPath .. "font-table.png"
-local outputPath = dir .. extParentPath .. "design.aseprite"
-local designPath = dir .. "/design/"
-local configPath = config .. "/font.yml"
+local projectsPath = "projects"
+local extParentPath = is_extension and "ext-" or ""
+local fontTablePath = app.fs.joinPath(dir, extParentPath .. "font-table.png")
+local outputPath = app.fs.joinPath(dir, extParentPath .. "design.aseprite")
+local designPath = app.fs.joinPath(dir, "design")
+local configPath = app.fs.joinPath(config, "font.yml")
 
 simpleyaml = require("simpleyaml")
 
@@ -195,4 +196,5 @@ sprite:setPalette(palette)
 
 sprite:saveAs(outputPath)
 
-print((exists and "Overwritten " or "Generated ") .. outputPath)
+local path = outputPath:match(projectsPath .. "(.*)$") or outputPath
+print((exists and "Overwritten '" or "Generated '") .. projectsPath .. path .. "'")

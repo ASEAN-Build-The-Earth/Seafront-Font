@@ -30,7 +30,7 @@ if not config then
 end
 
 ---@type Sprite the active sprite as source
-local source = app.activeSprite
+local source = app.sprite
 
 if source == nil then
     error("No sprite opened")
@@ -39,9 +39,10 @@ end
 local app_filename = app.fs.fileName(app.sprite.filename)
 local is_extension = app_filename:match("^ext%-(.+)%.aseprite$") and true or false
 
-local configPath = config .. "/font.yml"
+local configPath = app.fs.joinPath(config, "font.yml")
 local dir = app.fs.filePath(app.sprite.filename)
 local exportPath = app.fs.joinPath(dir, "export")
+local projectsPath = "projects"
 
 simpleyaml = require("simpleyaml")
 graphics = require("graphics")
@@ -132,7 +133,8 @@ local function exportGraphic(design, family)
 
     export:saveAs(fileOutput)
 
-    print("Generated " .. fileOutput)
+    local exportPath = fileOutput:match(projectsPath .. "(.*)$") or fileOutput
+    print("Generated '" .. projectsPath .. exportPath .. "'")
 end
 
 for _, family in ipairs(font.typeface.family) do

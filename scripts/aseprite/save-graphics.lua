@@ -31,17 +31,18 @@ if not config then
 end
 
 ---@type Sprite the active sprite as source
-local source = app.activeSprite
+local source = app.sprite
 
 if source == nil then
     error("No sprite opened")
 end
 
-local configPath = config .. "/font.yml"
+local configPath = app.fs.joinPath(config, "font.yml")
 local dir = app.fs.filePath(app.sprite.filename)
 local designPath = app.fs.joinPath(dir, "design")
 local app_filename = app.fs.fileName(app.sprite.filename)
 local is_extension = app_filename:match("^ext%-(.+)%.aseprite$") and true or false
+local projectsPath = "projects"
 
 simpleyaml = require("simpleyaml")
 graphics = require("graphics")
@@ -54,7 +55,8 @@ for _, family in ipairs(font.family) do
 	local layers = graphics.find_design_layers(source, font, family)
 
 	if layers == nil or # (layers) == 0 then
-		error("No graphic layer found for family : " .. family)
+		print("Warning: No graphic layer found for family '" .. family .. "'")
+		goto cont_save_graphics
 	end
 
 	print("Saving " .. family)
@@ -83,7 +85,9 @@ for _, family in ipairs(font.family) do
 				-- that is position elsewhere (not 0,0)
 				image:drawImage(sourceImage, Point(imageX, imageY))
 				image:saveAs(path)
-				print("Saved '" .. path .. "'")
+
+				local imagePath = path:match(projectsPath .. "(.*)$") or path
+				print("Saved '" .. projectsPath .. imagePath .. "'")
 			else
 				err = "Image not found inside graphic layer"
 			end
@@ -95,4 +99,5 @@ for _, family in ipairs(font.family) do
 			error(err .. ': "' .. family .. '/' .. style .. '"')
 		end
     end
+	::cont_save_graphics::
 end
