@@ -10,12 +10,18 @@ https://openfontlicense.org
 ------------------------------------------------------------
 -- export-graphics.lua
 --
+-- Export graphic layers inside design file 'design.aseprite',
+-- as sprite frame ordered cell indexes 'export.aseprite'
+--
 -- Usage:
 --
--- aseprite --batch design.aseprite \
---   --script export-graphics.lua \
---   --script-param output=export.aseprite
+-- aseprite --batch "/path/to/projects/{name}/design.aseprite" \
+--          --script-param config="/path/to/font/" \
+--          --script /path/to/scripts/aseprite/export-graphics.lua
 ------------------------------------------------------------
+---@alias Sprite aseprite [sprite](https://www.aseprite.org/api/sprite) object
+---@alias Layer aseprite [layer](https://www.aseprite.org/api/layer) object
+---@alias DesignLayers table<number, { "style": string, "layer": Layer }>
 
 local config = app.params["config"]
 
@@ -23,6 +29,7 @@ if not config then
     error("Missing script parameter: config")
 end
 
+---@type Sprite the active sprite as source
 local source = app.activeSprite
 
 if source == nil then
@@ -39,10 +46,14 @@ local exportPath = app.fs.joinPath(dir, "export")
 simpleyaml = require("simpleyaml")
 graphics = require("graphics")
 
+---@type table<string, ?> font.yml parsed config table
 local font = simpleyaml.parse_file(configPath, nil)
 
--- print(font.profile.typography["origin-x"] + font.profile.typography["italic-angle"])
-
+--- Export design layer of a font family ordered by all cels to sprite frames.
+--- Export file are under /export/{family}/{style}.aseprite
+---
+---@param design { "style": string, "layer": Layer } Design layer information
+---@param family string The family name of this graphics layer
 local function exportGraphic(design, family)
     local style = design.style
     local graphicsLayer = design.layer
@@ -113,7 +124,6 @@ local function exportGraphic(design, family)
             image,
             Point(0, 0)
         )
-
     end
 
     ------------------------------------------------------------
@@ -126,15 +136,15 @@ local function exportGraphic(design, family)
 end
 
 for _, family in ipairs(font.typeface.family) do
+	---@type DesignLayers design layers of this family
     local layers = graphics.find_design_layers(source, font.typeface, family)
 
 	if layers == nil or # (layers) == 0 then
-		error("No graphic layer found for family : " .. family)
-	end
-
-	print("Exporting sprite sheet for: " .. family)
-
-    for _, design in ipairs(layers) do
-        exportGraphic(design, family)
+		print("Warning: No graphic layer found for family '" .. family .. "'")
+	else
+        print("Exporting sprite sheet for: " .. family)
+        for _, design in ipairs(layers) do
+            exportGraphic(design, family)
+        end
     end
 end

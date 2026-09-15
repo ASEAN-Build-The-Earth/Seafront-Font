@@ -21,12 +21,16 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 --]]
-
+---@module 'simpleyaml'
 local simpleyaml = {}
 
--- Simple YAML parser which parse only string value wrapped in double quote
--- parses the YAML file at `path` to a Lua table
--- returns `nil` in case of error
+--- Simple YAML parser which parse only string value wrapped in double quote
+---
+--- parses the YAML file at `path` to a Lua table
+---@param path string Path to yaml file
+---@param root string Key name of a root key to find,
+---            parsed table will be items in that root.
+---@return table<string, ?> `nil` in case of error.
 function simpleyaml.parse_file(path, root)
   -- helper function to apply function `f(data)` at `nestingLevel` of `tab`
   local function atNestingLevel(nestingLevel, f, data, tab)

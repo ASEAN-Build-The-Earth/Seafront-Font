@@ -7,11 +7,23 @@ This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is available with a FAQ at:
 https://openfontlicense.org
 --]]
-
+---@module 'graphics'
 graphics = {}
 
+---@alias Sprite aseprite [sprite](https://www.aseprite.org/api/sprite) object
+---@alias Layer aseprite [layer](https://www.aseprite.org/api/layer) object
+---@alias Font table<string, ?> font.yml parsed config table
+---@alias DesignLayers table<number, { "style": string, "layer": Layer }>
+
+--- Find design layer(s) of a font family name within source sprite.
+---
+---@param source Sprite aseprite source to find design layer.
+---@param font font.yml config table.
+---@param familyName string Family name of the design to find.
+---@return DesignLayers Table of all found layer.
 function graphics.find_design_layers(source, font, familyName)
 	local function collectDesignLayers(familyGroup)
+		---@type DesignLayers
 		layers = {} -- list of layers
 
 		for _, layer in ipairs(familyGroup.layers) do
