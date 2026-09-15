@@ -49,6 +49,7 @@ path = "src/seafront/__about__.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests/*"]
+addopts = ["-v", "--doctest-modules", "src/seafront/unicode.py"] # rn only unicode.py have doctest
 
 [project.scripts]
 generate-project = "scripts.generate_project:main"

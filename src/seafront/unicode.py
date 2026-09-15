@@ -54,6 +54,19 @@ def parse_codepoint(value: Any) -> int:
     """
     Parse a YAML value into a Unicode code point integer.
 
+    >>> parse_codepoint(65)
+    65
+    >>> parse_codepoint("0x41")
+    65
+    >>> parse_codepoint(r"\\u0041")
+    65
+    >>> parse_codepoint("U+0041")
+    65
+    >>> parse_codepoint("uni0041")
+    65
+    >>> parse_codepoint("0041")
+    65
+
     :return int: Unicode code point in the range 0x0000..0x10FFFF.
     :raise TypeError: If the value is not a supported type.
     :raise ValueError: If the value is not a valid Unicode code point.
