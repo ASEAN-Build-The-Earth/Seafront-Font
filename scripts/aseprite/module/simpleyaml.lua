@@ -39,8 +39,12 @@ function simpleyaml.parse_file(path, options)
       f(data, tab)
     else -- go deeper recursively
       local key = tab[#tab]
-      if key ~= nil then
-        atNestingLevel(nestingLevel - 1, f, data, key.val)
+      if type(key) == "table" then
+        if #key > 0 then
+          atNestingLevel(nestingLevel - 1, f, data, key)
+        else
+          atNestingLevel(nestingLevel - 1, f, data, key.val)
+        end
       end
     end
   end
@@ -50,9 +54,7 @@ function simpleyaml.parse_file(path, options)
     atNestingLevel(
       nestingLevel,
       function(k, t)
-        if type(t) == "table" then
-          t[#t + 1] = { key = k, val = {} }
-        end
+        t[#t + 1] = { key = k, val = {} }
       end,
       key,
       tab
@@ -60,40 +62,20 @@ function simpleyaml.parse_file(path, options)
   end
 
   -- helper function to insert value `str` at `nestingLevel` of `tab`
-  local function insertString(str, nestingLevel, tab, index)
+  local function insertString(str, nestingLevel, tab)
     atNestingLevel(
       nestingLevel,
       function(s, t)
         local key = t[#t]
-        if key ~= nil then
-          if key.val ~= nil then
-            if #key.val > 0 then
-              local subkey = key.val[#key.val][index]
-              subkey[#subkey].val = s
-            else
-              key.val = s
-            end
-          end
-        end
-      end,
-      str,
-      tab
-    )
-  end
-
-  local function insertList(str, nestingLevel, tab, index)
-    atNestingLevel(
-      nestingLevel,
-      function(s, t)
-        local key = t[#t]
-        if key ~= nil then
-          if key.val ~= nil then
-            local n = # (key.val)
-            key.val[n + 1] = s
+        if type(key.val) == "table" then
+          -- key.val default value is an empty table,
+          -- but if the table is inserted as ipairs.
+          -- We retrieve the last index and set the last val of it.
+          if #key.val > 0 then
+            local subkey = key.val[#key.val]
+            subkey[#subkey].val = s
           else
-            local subkeys = key[index]
-            local subitem = subkeys[#subkeys]
-            subitem.val[#subitem + 1] = s
+            key.val = s
           end
         end
       end,
@@ -102,29 +84,27 @@ function simpleyaml.parse_file(path, options)
     )
   end
 
-  local function insertListedKey(str, nestingLevel, tab, index)
+  local function insertList(str, nestingLevel, tab)
     atNestingLevel(
       nestingLevel,
       function(s, t)
         local key = t[#t]
-        local listed = # (key.val)
+        local n = # (key.val)
+        key.val[n + 1] = s
+      end,
+      str,
+      tab
+    )
+  end
+
+  local function insertListedKey(str, nestingLevel, tab)
+    atNestingLevel(
+      nestingLevel,
+      function(s, t)
+        local key = t[#t]
+        local n = # (key.val)
         local insert = { key = s, val = {} }
-
-        if listed == 0 then -- listed key is empty
-          --- Listed keys require one table wrapper which will act as a list.
-          key.val[listed + 1] = { { insert } }
-        else
-          --- Following list insertions are as: { { insert }, { insert }, ... }
-          local list = key.val[#key.val]
-          local size = # (list)
-          if index > size then
-            list[size + 1] = { insert }
-          else
-            --- Each 'insert' can insert n more key:value pair, we will call it subkey.
-            local subkey = list[index]
-            subkey[#subkey + 1] = insert
-          end
-        end
+        key.val[n + 1] = { insert }
       end,
       str,
       tab
@@ -134,33 +114,34 @@ function simpleyaml.parse_file(path, options)
   -- flatten parsing table by removing indices, so the resulting table can directly be indexed with the YAML keys
   local function flatten(parsed, ordered)
     local flattened = {}
-    for _, item in ipairs(parsed) do -- for all key-value pairs
-      if type(item) == "string" then -- if each members are string, it is an array object
-          flattened[#flattened + 1] = item
-      elseif type(item.val) ~= "string" then -- if the value is not a string (it's a table)
-        -- Table can be of 2 type:
-        if item.key == nil then
-          -- 1. Table that doesn't match key:val pair are nested ipairs table
-          for i, subitem in ipairs(item) do
-            -- Insert them as i indexed list of flatten subitems
-            flattened[i] = flatten(subitem, ordered)
-          end
-        else
-          -- 2. key:val pair table can be flatten directly
+
+    local function flattenTable(key, value)
+      local keyIndex = ordered and #flattened + 1 or key
+      local flatPair = ordered and { key = key, val = value } or value
+      flattened[keyIndex] = flatPair
+    end
+
+    -- for all key-value pairs
+    for _, item in ipairs(parsed) do
+      if type(item) ~= "table" then
+        -- If each members aren't table, it is an array member
+        flattened[#flattened + 1] = item
+        goto cont_flatten_pair
+      end
+
+      if #item > 0 then
+        -- ipairs listed items
+        flattened[#flattened + 1] = flatten(item, ordered)
+      elseif item.key ~= nil then
+        -- key-value pair, also need to make sure val is flatten
+        if type(item.val) == "table" then
           local value = flatten(item.val, ordered)
-          if ordered then
-            flattened[#flattened + 1] = { key = item.key, val = value }
-          else
-            flattened[item.key] = value
-          end
-        end
-      else -- if the value is a string
-        if ordered then
-          flattened[#flattened + 1] = { key = item.key, val = item.val }
+          flattenTable(item.key, value)
         else
-          flattened[item.key] = item.val -- just assign it
+          flattenTable(item.key, item.val)
         end
       end
+      ::cont_flatten_pair::
     end
     return flattened
   end
@@ -187,17 +168,20 @@ function simpleyaml.parse_file(path, options)
   local isInsideRoot = true
   local indents      = {} -- stack of indents
   local parsed       = {} -- resulting table
-  local invalidValue = nil
-  local flaggedValue = nil
-  local isInsideList = nil -- Nested table inside list
-  local hasListIndex = nil
+
+  --- FIXME: we flag some line because we have not implement those yaml feature yet:
+  --- A value may be invalid (invalidValue)
+  --- which will flag the indents below it (flaggedValue),
+  --- keep those flagged until indent is less than it.
+  ---@type number | nil
+  local invalidValue, flaggedValue
 
   local function insertValue(line, insertLevel, updates)
     if line ~= nil and line:len() > 0 then
       -- First, find value wrapped in string literal ""
       local value = line:match("^%s*\"(.-)\"%s*$")
       if value ~= nil and value:len() > 0 then
-        insertString(value, insertLevel, updates, hasListIndex)
+        insertString(value, insertLevel, updates)
         return true
       elseif matchTokens(line, { '~', "^#.*" }) then
         -- '~' are nil value, we can pass this true while not inserting value
@@ -206,7 +190,7 @@ function simpleyaml.parse_file(path, options)
       elseif not matchTokens(line, { '|', '>', ">+", "|-" }) then
         -- Else, we can include any value that does NOT match string literal block,
         -- its hard to parse and doesn't fit the scope of simpleyaml.
-        insertString(line, insertLevel, updates, hasListIndex)
+        insertString(line, insertLevel, updates)
         return true
       else
         -- Else, the value is unsupported, e.g. string literal blocks identifier
@@ -270,23 +254,15 @@ function simpleyaml.parse_file(path, options)
     -- Try to read line as dash prefixed list first
     local listedKey = line:match("^%s*%-%s(.-):")
     if listedKey ~= nil and listedKey:len() > 0 and isInsideRoot then
-      if hasListIndex ~= nil then
-        hasListIndex = hasListIndex + 1
-      else
-        hasListIndex = 1
-      end
-      isInsideList = nestingLevel - 1
-      insertListedKey(listedKey, isInsideList, parsed, hasListIndex)
+      -- Drop 1 nesting level (to the parent) and insert its value (as array/list)
+      insertListedKey(listedKey, nestingLevel - 1, parsed)
 
       -- listed key could have an initial value
       local val = line:match(":%s*(.*)%s*")
-      local insert = insertValue(val, isInsideList, parsed)
+      local insert = insertValue(val, nestingLevel - 1, parsed)
       if insert ~= nil then
         invalidValue = not insert and indent or nil
       end
-      -- Drop 1 nesting level (to the parent) and insert its value (as array/list)
-      -- insertList(list, nestingLevel - 1, parsed)
-      -- invalidValue = nil
       goto cont_processing_lines
     end
 
@@ -294,14 +270,14 @@ function simpleyaml.parse_file(path, options)
     local list = line:match("^%s*%-%s*\"(.-)\"%s*$")
     if list ~= nil and list:len() > 0 and isInsideRoot then
       -- Drop 1 nesting level (to the parent) and insert its value (as array/list)
-      insertList(list, nestingLevel - 1, parsed, hasListIndex)
+      insertList(list, nestingLevel - 1, parsed)
       invalidValue = nil
       goto cont_processing_lines
     end
 
     -- read rest of the line (everything after the first ':')
     local val = line:match(":%s*(.*)%s*")
-    local key = nil
+    local key
 
     -- read the key from the line (everything before ':')
     if val ~= nil and val:len() > 0 then
@@ -333,27 +309,12 @@ function simpleyaml.parse_file(path, options)
       goto cont_processing_lines
     end
 
-    -- Check if key is listed
-    local insertLevel = nestingLevel
-    local insertedKey = false
-    if isInsideList then
-      if insertLevel > isInsideList then
-        insertLevel = isInsideList
-        insertListedKey(key, insertLevel, parsed, hasListIndex)
-        insertedKey = true
-      else
-        isInsideList = nil
-        hasListIndex = nil
-      end
-    end
     -- insert the key
-    if not insertedKey then
-      insertKey(key, insertLevel, parsed)
-    end
+    insertKey(key, nestingLevel, parsed)
 
     -- if there is something, insert the rest of the line as a string value
     -- otherwise, the value is an object, so go ahead to read next line
-    local insert = insertValue(val, insertLevel, parsed)
+    local insert = insertValue(val, nestingLevel, parsed)
     if insert ~= nil then
       invalidValue = not insert and (indent) or nil
     end
