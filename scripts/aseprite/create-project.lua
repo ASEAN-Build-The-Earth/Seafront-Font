@@ -21,9 +21,9 @@ https://openfontlicense.org
 --          --script-param ext="False"|"True",
 --          --script /path/to/scripts/aseprite/create-graphics.lua
 ------------------------------------------------------------
----@alias Sprite aseprite [sprite](https://www.aseprite.org/api/sprite) object
----@alias Layer aseprite [layer](https://www.aseprite.org/api/layer) object
----@alias Design { "style": string, "layer": Layer }
+---@alias Sprite any aseprite [sprite](https://www.aseprite.org/api/sprite) object
+---@alias Layer any aseprite [layer](https://www.aseprite.org/api/layer) object
+---@alias Design { style: string, layer: Layer }
 
 local dir = app.params["dir"]
 local ext = app.params["ext"]
@@ -44,9 +44,9 @@ local outputPath = app.fs.joinPath(dir, extParentPath .. "design.aseprite")
 local designPath = app.fs.joinPath(dir, "design")
 local configPath = app.fs.joinPath(config, "font.yml")
 
-simpleyaml = require("simpleyaml")
+simpleyaml = require("module.simpleyaml")
 
----@type table<string, ?> font.yml parsed config table
+---@type table<string, any> font.yml parsed config table
 local font = simpleyaml.parse_file(configPath, { root="typeface" })
 
 local tableSprite = app.open(fontTablePath)
@@ -67,7 +67,7 @@ end)
 --- Load all available design images (.png) under a folder
 ---
 ---@param folder string The folder path to typeface design to look for
----@return {"families":  {"name": string, "designs": table<number, Design>}}
+---@return { families:  { name: string, designs: table<number, Design> } }
 function loadDesign(folder)
      local typeface = {
         families = {} -- name, designs

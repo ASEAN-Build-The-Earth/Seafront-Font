@@ -18,11 +18,11 @@ https://openfontlicense.org
 --          --script-param config="/path/to/font/" \
 --          --script /path/to/scripts/aseprite/save-graphics.lua
 ------------------------------------------------------------
----@alias Sprite aseprite [sprite](https://www.aseprite.org/api/sprite) object
----@alias Layer aseprite [layer](https://www.aseprite.org/api/layer) object
----@alias Cel aseprite [cel](https://www.aseprite.org/api/cel) object
----@alias Image aseprite [image](https://www.aseprite.org/api/image) object
----@alias DesignLayers table<number, { "style": string, "layer": Layer }>
+---@alias Sprite any aseprite [sprite](https://www.aseprite.org/api/sprite) object
+---@alias Layer any aseprite [layer](https://www.aseprite.org/api/layer) object
+---@alias Cel any aseprite [cel](https://www.aseprite.org/api/cel) object
+---@alias Image any aseprite [image](https://www.aseprite.org/api/image) object
+---@alias DesignLayers table<number, { style: string, layer: Layer }>
 
 local config = app.params["config"]
 
@@ -44,10 +44,10 @@ local app_filename = app.fs.fileName(app.sprite.filename)
 local is_extension = app_filename:match("^ext%-(.+)%.aseprite$") and true or false
 local projectsPath = "projects"
 
-simpleyaml = require("simpleyaml")
-graphics = require("graphics")
+simpleyaml = require("module.simpleyaml")
+graphics = require("module.graphics")
 
----@type table<string, ?> font.yml parsed config table
+---@type table<string, any> font.yml parsed config table
 local font = simpleyaml.parse_file(configPath, { root="typeface" })
 
 for _, family in ipairs(font.family) do
@@ -69,6 +69,12 @@ for _, family in ipairs(font.family) do
 		local out = app.fs.joinPath(designPath, family) --[[@as string]]
 		local cel = graphicsLayer:cel(app.activeFrame) --[[@as Cel]]
 		local err = nil --[[@as nil|string]]
+		local mkdir = app.fs.makeAllDirectories(out)
+
+		if mkdir then
+			local mkdirPath = out:match(projectsPath .. "(.*)$") or out
+			print("Created directory: '" .. projectsPath .. mkdirPath .. "'")
+		end
 
 		if cel then
 			if cel.image then
