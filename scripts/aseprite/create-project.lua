@@ -47,7 +47,7 @@ local configPath = app.fs.joinPath(config, "font.yml")
 simpleyaml = require("simpleyaml")
 
 ---@type table<string, ?> font.yml parsed config table
-local font = simpleyaml.parse_file(configPath, "typeface")
+local font = simpleyaml.parse_file(configPath, { root="typeface" })
 
 local tableSprite = app.open(fontTablePath)
 local width = tableSprite.width

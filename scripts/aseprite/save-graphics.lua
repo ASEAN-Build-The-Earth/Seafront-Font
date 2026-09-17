@@ -48,7 +48,7 @@ simpleyaml = require("simpleyaml")
 graphics = require("graphics")
 
 ---@type table<string, ?> font.yml parsed config table
-local font = simpleyaml.parse_file(configPath, "typeface")
+local font = simpleyaml.parse_file(configPath, { root="typeface" })
 
 for _, family in ipairs(font.family) do
 	---@type DesignLayers design layers of this family
