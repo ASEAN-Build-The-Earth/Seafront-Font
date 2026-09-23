@@ -55,7 +55,7 @@ for _, family in ipairs(font.family) do
 	local layers = graphics.find_design_layers(source, font, family)
 
 	if layers == nil or # (layers) == 0 then
-		print("Warning: No graphic layer found for family '" .. family .. "'")
+		print("\27[33mWarning (Saves): No graphic layer found for family '" .. family .. "'\27[0m")
 		goto cont_save_graphics
 	end
 
@@ -73,7 +73,7 @@ for _, family in ipairs(font.family) do
 
 		if mkdir then
 			local mkdirPath = out:match(projectsPath .. "(.*)$") or out
-			print("Created directory: '" .. projectsPath .. mkdirPath .. "'")
+			print("Using directory: '" .. projectsPath .. mkdirPath .. "'")
 		end
 
 		if cel then

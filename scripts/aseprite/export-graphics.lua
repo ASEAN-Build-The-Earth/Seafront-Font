@@ -11,7 +11,8 @@ https://openfontlicense.org
 -- export-graphics.lua
 --
 -- Export graphic layers inside design file 'design.aseprite',
--- as sprite frame ordered cell indexes 'export.aseprite'
+-- as glyphs .pbm bimap files.
+-- Optionally for debugging as sprite frames 'export.aseprite'
 --
 -- Usage:
 --
@@ -27,6 +28,7 @@ https://openfontlicense.org
 ---@alias Sprite any aseprite [sprite](https://www.aseprite.org/api/sprite) object
 ---@alias Layer any aseprite [layer](https://www.aseprite.org/api/layer) object
 ---@alias DesignLayers table<number, { style: string, layer: Layer }>
+---@alias Color { r: number, g: number, b: number, a: number }
 
 local config = app.params["config"]
 local start0 = app.params["codepoint"]
@@ -76,7 +78,8 @@ local projectsPath = "projects"
 ---@type table<string, any> font.yml parsed config table
 local font = simpleyaml.parse_file(configPath, nil)
 
-local extGlyphs = nil
+---@type table<number, { name: string, cmap: number }> | nil
+local extGlyphs
 if is_extension then
     local rawGlyph = simpleyaml.parse_file(extGlyphsYML, {  root="glyphs", ordered=true })
     extGlyphs = glyphs.parseExtraGlyphs(rawGlyph)
@@ -106,7 +109,9 @@ local function exportGraphic(design, family)
     local imageY = cel.position.y
 
     ------------------------------------------------------------
-    -- Constants
+    -- Setups & Constants
+    -- Typography constants is configured under /font/font.yml
+    -- Calculations also mirrors /seafront/core/graphics.py
     ------------------------------------------------------------
     local name = is_extension and ("ext-" .. style) or style
     local fileOutput = app.fs.joinPath(out, name .. ".aseprite")
@@ -118,30 +123,55 @@ local function exportGraphic(design, family)
         print("Using directory: '" .. projectsPath .. mkdirPath .. "'")
     end
 
-    local CELL = 64
-    local PBM_CELL = 32
+    --- /seafront/generate.py:CELL_SIZE constant
+    local CELL_SIZE <const> = 64
 
-    local rows = math.floor(source.height / CELL)
-    local columns = math.floor(source.width / CELL)
-    local glyphCount = rows * columns
-    local export = Sprite(PBM_CELL, PBM_CELL, ColorMode.INDEXED)
-    local palette = Palette(3)
+    local rows <const> = math.floor(source.height / CELL_SIZE)
+    local columns <const> = math.floor(source.width / CELL_SIZE)
+    local glyphCount <const> = rows * columns
 
-    palette:setColor(2, Color{ r=255, g=255, b=255, a=255 })
-    palette:setColor(1, Color{ r=0, g=0, b=0, a=255 })
-    palette:setColor(0, Color{ r=0, g=0, b=0, a=0 })
-    export:setPalette(palette)
+    local accent <const> = font.profile.accent.base
+    local typography <const> = font.profile.typography
 
+    local pbmCell <const> = accent["ascender"] + accent["descender"]
+    local leftX <const> = pbmCell - typography["maximum-width"]
+    local cropX <const> = typography["origin-x"] - leftX
+    local cropY <const> = typography["origin-y"] + accent["descender"]
+
+    ------------------------------------------------------------
+    -- Generate frames
+    -- Create a separate aseprite sprite and
+    -- compile all glyphs in to them as frame.
+    ------------------------------------------------------------
+    local export = Sprite(pbmCell, pbmCell, ColorMode.INDEXED)
     export.filename = fileOutput
 
+    --- The palette of exports sprite, color mode are indexed
+    --- by the actual index value of the palette:
+    ---   * 0: Aseprite transparent layer (required)
+    ---   * 1: Full black
+    ---   * 2: Full white
+    ---@class Palette [Palette](https://www.aseprite.org/api/palette)
+    ---@field setColor fun(index: number, color: Color):void Changes a palette color in the given entry index
+    ---@type Palette
+    local palette = Palette(3)
+    palette:setColor(0, Color{ r=0, g=0, b=0, a=0 })
+    palette:setColor(1, Color{ r=0, g=0, b=0, a=255 })
+    palette:setColor(2, Color{ r=255, g=255, b=255, a=255 })
+    export:setPalette(palette)
+
+    --- The get the default layer (1st index) of a new export sprite.
+    --- Will always be a transparent 'Background' layer initially,
+    --- we clear them to the color of index 2: Full white
+    ---@type Layer
     local layer = export.layers[1]
     layer:cel().image:clear(2)
+
+    --- Create a separate layer to paste glyph images in.
+    ---@type Layer
     local outLayer = export:newLayer()
     outLayer.name = "Glyph"
     export.transparentColor = 0
-    ------------------------------------------------------------
-    -- Generate frames
-    ------------------------------------------------------------
 
     local built = 0
     for i = 0, glyphCount - 1 do
@@ -151,29 +181,22 @@ local function exportGraphic(design, family)
         end
 
         local frame = export.frames[i + 1]
-        local image = Image(PBM_CELL, PBM_CELL, ColorMode.INDEXED)
+        local image = Image(pbmCell, pbmCell, ColorMode.INDEXED)
 
-        local accent = font.profile.accent.base
-        local typography = font.profile.typography
-
-        local leftX = PBM_CELL - typography["maximum-width"]
-        local cropX = typography["origin-x"] - leftX
-        local cropY = typography["origin-y"] + accent["descender"]
-
-        local x = (i % columns) * CELL - imageX + cropX
-        local y = math.floor(i / columns) * CELL - imageY + cropY
+        local x = (i % columns) * CELL_SIZE - imageX + cropX
+        local y = math.floor(i / columns) * CELL_SIZE - imageY + cropY
 
         image:drawImage(sourceImage, Point(-x, -y))
 
         if not image:isEmpty() then
 
             if is_extension then
-                local profile = extGlyphs[i + 1]
+                local glyph = extGlyphs[i + 1]
                 local extName
-                if profile.name ~= nil then
-                    extName = profile.name .. ".pbm"
-                elseif profile.cmap ~= nil then
-                    extName = string.format("uni%04X.pbm", profile.cmap)
+                if glyph.name ~= nil then
+                    extName = string.format("%s.pbm", glyph.name)
+                elseif glyph.cmap ~= nil then
+                    extName = string.format("uni%04X.pbm", glyph.cmap)
                 else
                     extName = glyphs.getExtraGlyphLabel(i)
                     print("\27[33mWARNING: Extra glyph '" .. extName .. "' has no configured name.\27[0m")
@@ -198,8 +221,6 @@ local function exportGraphic(design, family)
                         "U+%04X", glyph_unicode) .. "): " .. pbm_file)
                 end
             end
-
-
         elseif verbose then
             if codepoint ~= nil then
                 print("Skipped " .. string.format(
@@ -230,7 +251,7 @@ for _, family in ipairs(font.typeface.family) do
     local layers = graphics.find_design_layers(source, font.typeface, family)
 
 	if layers == nil or # (layers) == 0 then
-		print("\27[33mWarning: No graphic layer found for family '" .. family .. "'\27[0m")
+		print("\27[33mWarning (Exports): No graphic layer found for family '" .. family .. "'\27[0m")
 	else
         if verbose then
             print("Exporter family: " .. family)
