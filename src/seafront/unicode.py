@@ -9,9 +9,55 @@
 Unicode blocks collection mapping
 """
 from seafront.font import unicode_blocks_json as unicode
-from typing import TypedDict, ReadOnly, Any
+from typing import TypedDict, ReadOnly, Any, Literal
 import re
 import json
+
+NonPrintableSeparator = Literal["Zs", "Zl", "Zp"]
+"""
+Unicode category 'Separator'
+
+====  ====================  ===============
+Abbr          Long           Description
+====  ====================  ===============
+ Zs    Space_Separator       a space character (of various non-zero widths)
+ Zl    Line_Separator        U+2028 LINE SEPARATOR only
+ Zp    Paragraph_Separator   U+2029 PARAGRAPH SEPARATOR only
+====  ====================  ===============
+"""
+
+NonPrintable = Literal["Cc", "Cf", "Cs", "Co", "Cn"]
+"""
+Unicode category 'Other'
+
+====  ============  ===============
+Abbr      Long        Description
+====  ============  ===============
+ Cc    Control       a C0 or C1 control code
+ Cf    Format        a format control character
+ Cs    Surrogate     a surrogate code point
+ Co    Private_Use   a private-use character
+ Cn    Unassigned    a reserved unassigned code point or a noncharacter
+====  ============  ===============
+"""
+
+
+def is_non_printable(category: str,
+                     *omit: NonPrintable | NonPrintableSeparator) -> bool:
+    """
+    Check Unicode data's category if it is a non-printable character
+
+    :param category: unicodedata.category(str) General Category Value
+    :param omit: Optionally omit some category
+    :return: True if category is one of 'C' or 'Z' category.
+    """
+    non_printable: set[NonPrintable | NonPrintableSeparator] = {
+        "Cc", "Cf", "Cs", "Co", "Cn", "Zs", "Zl", "Zp"
+    }
+    for item in omit:
+        non_printable.remove(item)
+    return category in non_printable
+
 
 class UnicodeBlock(TypedDict):
     """

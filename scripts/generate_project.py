@@ -22,14 +22,18 @@ using python::
 """
 from importlib.resources import as_file
 from importlib.resources.abc import Traversable
+from unicodedata import category
+from typing import cast, TypedDict, BinaryIO, TextIO
+
 from PIL import Image
 from PIL import ImageFont
-from PIL.ImageFile import ImageFile
+from PIL.Image import Image as Sheet
+from PIL.ImageFont import BaseImageFont
 
-from seafront.generate import generate_font_table
+from seafront.generate import generate_font_table, load_unifont_hex
 from seafront.core.design.aseprite_scripts import create_project
 from seafront.model.glyphs import parse_extra_glyphs, get_extra_glyph_label
-from seafront.unicode import load_unicode_blocks
+from seafront.unicode import load_unicode_blocks, UnicodeBlock, is_non_printable
 from seafront.font import (
     project_yml,
     project_root,
@@ -41,9 +45,11 @@ from seafront.font import (
 import yaml
 import argparse
 
-FONT_16: str = "BTE-Seafront-Square-Regular.ttf"
+FONT16_REGULAR: str = "BTE-Seafront-Square-Regular.ttf"
+FONT_CONDENSED: str = "BTE-Seafront-Square-Condensed.ttf"
 CELL_64: str = "font-cell-64px.png"
 NULL_64: str = "null-cell-64px.png"
+UNIFONT: str = "unifont_sample-18.0.01.hex"
 
 
 def load_yaml(file: Traversable):
@@ -53,14 +59,15 @@ def load_yaml(file: Traversable):
 
 def has_graphic(unicode: int) -> bool:
     char: str = chr(unicode)
-    return char.isprintable() and not char.isspace()
+    return not is_non_printable(category(char))
 
 
-def generate(block_name, block):
-    with as_file(ASSETS_DIR) as assets:
-        font_cell = Image.open(assets / CELL_64).convert("RGBA")
-        null_cell = Image.open(assets / NULL_64).convert("RGBA")
-        label_font = ImageFont.truetype(assets / FONT_16, 16)
+def generate(block_name: str, block: UnicodeBlock, assets: ImageAssets):
+    font_cell: Sheet = assets["font_cell"]
+    null_cell: Sheet = assets["null_cell"]
+    unifont_hex: dict[int, bytes] = assets["unifont_hex"]
+    label_font: tuple[BaseImageFont, BaseImageFont] = (assets["font16_regular"],
+                                                       assets["font_condensed"])
 
     project = project_root(block_name)
     with as_file(project) as project_dir:
@@ -70,13 +77,13 @@ def generate(block_name, block):
     end = block["end"]
     count = end - start + 1
 
-    def fn(i: int) -> tuple[str, ImageFile]:
+    def fn(i: int) -> tuple[str, Sheet, int]:
         code: int = start + i
         name: str = f"U+{code:04X}"
         cell = font_cell if has_graphic(code) else null_cell
-        return name, cell
+        return name, cell, code
 
-    sheet = generate_font_table(fn, label_font, count)
+    sheet = generate_font_table(fn, label_font, count, unifont_hex)
 
     # TODO: Adapt to new graphics directory
     # graphics = output / "regular.png"
@@ -99,13 +106,13 @@ def generate(block_name, block):
         columns = glyphs_yml["column"]
         glyphs = glyphs_yml["glyphs"]
 
-        def fn(i: int) -> tuple[str, ImageFile]:
+        def fn(i: int) -> tuple[str, Sheet, int | None]:
             cell = null_cell if glyphs[i].is_undefined() else font_cell
-            return get_extra_glyph_label(i), cell
+            return get_extra_glyph_label(i), cell, glyphs[i].cmap
 
         print(f"{len(glyphs)} glyphs Extension feature found for '{block_name}' unicode range")
 
-        sheet = generate_font_table(fn, label_font, len(glyphs), columns)
+        sheet = generate_font_table(fn, label_font, len(glyphs), unifont_hex, columns)
         table = project_ext_font_table(block_name)
         exist = "Overwritten" if table.is_file() else "Generated"
         with as_file(table) as image_file:
@@ -113,6 +120,23 @@ def generate(block_name, block):
             print(f"{exist} Extension '{image_file.relative_to(project_dir.parents[1])}'")
 
         create_project(project, True)
+
+
+class ImageAssets(TypedDict):
+    """
+    Assets used in font table generation
+
+    :ivar font_cell: Font cell image for design graphics
+    :ivar null_cell: Font cell image for non-design graphics
+    :ivar font16_regular: label font for Regular style
+    :ivar font_condensed: label font for Condensed style
+    :ivar unifont_hex: Unifont Unicode table for character reference
+    """
+    font_cell: Sheet
+    null_cell: Sheet
+    font16_regular: BaseImageFont
+    font_condensed: BaseImageFont
+    unifont_hex: dict[int, bytes]
 
 
 def main():
@@ -126,11 +150,25 @@ def main():
         help="Unicode block identifier (default: generate all configured blocks)",
     )
 
+    # Load all assets we will need for font table generation
+    with ((ASSETS_DIR / CELL_64).open("rb") as cell_64,
+        (ASSETS_DIR / NULL_64).open("rb") as null_64,
+        (ASSETS_DIR / FONT16_REGULAR).open("rb") as font_16px,
+        (ASSETS_DIR / FONT_CONDENSED).open("rb") as font_16cd,
+        (ASSETS_DIR / UNIFONT).open("r") as unifont):
+        image_assets: ImageAssets = {
+            "font_cell": Image.open(cell_64).convert("RGBA"),
+            "null_cell": Image.open(null_64).convert("RGBA"),
+            "font16_regular": ImageFont.truetype(cast(BinaryIO, font_16px), 16),
+            "font_condensed": ImageFont.truetype(cast(BinaryIO, font_16cd), 16),
+            "unifont_hex": load_unifont_hex(cast(TextIO, unifont))
+        }
+
     args = parser.parse_args()
     if args.block:
         if args.block not in unicode_blocks:
             raise ValueError(f"Unknown Unicode block '{args.block}'")
-        generate(args.block, unicode_blocks[args.block])
+        generate(args.block, unicode_blocks[args.block], image_assets)
         return
 
     for block_id in project["blocks"]:
@@ -138,7 +176,7 @@ def main():
             raise ValueError(
                 f"'{block_id}' referenced in project.yml but not found in unicode-blocks.json"
             )
-        generate(block_id, unicode_blocks[block_id])
+        generate(block_id, unicode_blocks[block_id], image_assets)
 
 
 if __name__ == "__main__":
