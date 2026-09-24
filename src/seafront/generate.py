@@ -77,38 +77,3 @@ def generate_font_table(fn: Callable[[int], tuple[str, ImageFile]],
         )
 
     return sheet
-
-
-def generate_aseprite_project(project_dir: Traversable,
-                              is_extension: bool) -> None:
-    """
-    Spin a subprocess to run /scripts/aseprite/create-project.lua
-
-    :param project_dir: The directory path, must be convertible to Path object
-    :param is_extension: Is the project an extension project (ext-design.aseprite)
-    :raise CalledProcessError If an error occurred inside the executing script
-    :raise OSError If aseprite is not available in the system
-    :return: None
-    """
-    try:
-        # Virtual path Traversable should be convert back to
-        # pathlib to be sure aseprite file won't mistake it
-        with (as_file(project_dir) as project,
-              as_file(SCRIPTS_DIR / SCRIPT) as scripts,
-              as_file(FONT_DIR) as font):
-            subprocess.run([
-                "aseprite",
-                "--batch",
-                "--script-param", f"dir={project}",
-                "--script-param", f"config={font}",
-                "--script-param", f"ext={is_extension}",
-                "--script", scripts,
-            ], check=True)
-    except subprocess.CalledProcessError as internal_error:
-        print(f"{'\033[93m'}Internal error generating "
-              f".aseprite project file:\n{internal_error}{'\033[0m'}", file=stderr)
-        pass  # handle errors in the called executable
-    except OSError as os_error:
-        print(f"{'\033[93m'}Aseprite not found in system. "
-              f"Cannot generate .aseprite project file:\n{os_error}{'\033[0m'}", file=stderr)
-        pass  # executable not found

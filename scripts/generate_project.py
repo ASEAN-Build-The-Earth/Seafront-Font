@@ -26,7 +26,8 @@ from PIL import Image
 from PIL import ImageFont
 from PIL.ImageFile import ImageFile
 
-from seafront.generate import generate_font_table, generate_aseprite_project
+from seafront.generate import generate_font_table
+from seafront.core.design.aseprite_scripts import create_project
 from seafront.model.glyphs import parse_extra_glyphs, get_extra_glyph_label
 from seafront.unicode import load_unicode_blocks
 from seafront.font import (
@@ -90,7 +91,7 @@ def generate(block_name, block):
         sheet.save(image_file)
         print(f"{exist} '{image_file.relative_to(project_dir.parents[1])}'")
 
-    generate_aseprite_project(project, False)
+    create_project(project, False)
 
     extension: Traversable = ext_glyphs_yml(block_name)
     if extension.is_file():
@@ -111,7 +112,7 @@ def generate(block_name, block):
             sheet.save(image_file)
             print(f"{exist} Extension '{image_file.relative_to(project_dir.parents[1])}'")
 
-        generate_aseprite_project(project, True)
+        create_project(project, True)
 
 
 def main():
