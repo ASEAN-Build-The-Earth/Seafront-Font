@@ -54,7 +54,7 @@ def aseprite(projects: list[UnicodeBlock]) -> None:
 
 
 def png_image(projects: list[UnicodeBlock],
-              family_name: list[str]) -> None:
+              family_name: set[str]) -> None:
     with font.font_yml().open(encoding="utf-8") as io:
         config: FontYML = yaml.safe_load(io)
 

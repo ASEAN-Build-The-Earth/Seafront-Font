@@ -22,26 +22,22 @@ using python::
 """
 from importlib.resources import as_file
 from importlib.resources.abc import Traversable
+from pathlib import Path
 from unicodedata import category
-from typing import cast, TypedDict, BinaryIO, TextIO
+from typing import cast, TypedDict, BinaryIO, TextIO, Any
 
 from PIL import Image
 from PIL import ImageFont
 from PIL.Image import Image as Sheet
 from PIL.ImageFont import BaseImageFont
 
-from seafront.generate import generate_font_table, load_unifont_hex
+from seafront.core.design.project import check_extra_glyphs
+from seafront.generate import generate_font_table, load_unifont_hex, generate_empty_graphics
 from seafront.core.design.aseprite_scripts import create_project
-from seafront.model.glyphs import parse_extra_glyphs, get_extra_glyph_label
+from seafront.model.font import FontYML
+from seafront.model.glyphs import parse_extra_glyphs, get_extra_glyph_label, ExtraGlyphsList, EXT_PREFIX
 from seafront.unicode import load_unicode_blocks, UnicodeBlock, is_non_printable
-from seafront.font import (
-    project_yml,
-    project_root,
-    project_font_table,
-    project_ext_font_table,
-    ext_glyphs_yml,
-    ASSETS_DIR
-)
+import seafront.font as font
 import yaml
 import argparse
 
@@ -62,14 +58,39 @@ def has_graphic(unicode: int) -> bool:
     return not is_non_printable(category(char))
 
 
-def generate(block_name: str, block: UnicodeBlock, assets: ImageAssets):
+def put_empty_images(design: Traversable,
+                     parent: Path,
+                     style: str,
+                     cell_count: int,
+                     ext_glyphs: ExtraGlyphsList | None):
+    image = design / f"{style}.png"
+    if not image.is_file():
+        generate_empty_graphics(image, parent, cell_count)
+
+    if ext_glyphs is None:
+        return
+
+    ext_image = design / f"{EXT_PREFIX}{style}.png"
+    if ext_image.is_file():
+        return
+
+    generate_empty_graphics(ext_image,
+                            parent,
+                            len(ext_glyphs["glyphs"]),
+                            ext_glyphs["column"])
+
+def generate(block: UnicodeBlock,
+             assets: ImageAssets,
+             *,
+             families: set[str],
+             styles: list[str] | dict[str, Any]):
     font_cell: Sheet = assets["font_cell"]
     null_cell: Sheet = assets["null_cell"]
     unifont_hex: dict[int, bytes] = assets["unifont_hex"]
     label_font: tuple[BaseImageFont, BaseImageFont] = (assets["font16_regular"],
                                                        assets["font_condensed"])
 
-    project = project_root(block_name)
+    project = font.project_root(block["name"])
     with as_file(project) as project_dir:
         project_dir.mkdir(exist_ok=True)
 
@@ -85,14 +106,16 @@ def generate(block_name: str, block: UnicodeBlock, assets: ImageAssets):
 
     sheet = generate_font_table(fn, label_font, count, unifont_hex)
 
-    # TODO: Adapt to new graphics directory
-    # graphics = output / "regular.png"
-    #
-    # if not graphics.exists():
-    #     sheet.save(graphics)
-    #     print(f"Written Empty {graphics}")
+    ext_glyphs: ExtraGlyphsList | None = check_extra_glyphs(block["name"])
+    for family in families:
+        design = font.project_design(block["name"], family)
+        if not design.is_dir():
+            with as_file(design) as design_dir:
+                design_dir.mkdir(parents=True,exist_ok=True)
+        for style in styles:
+            put_empty_images(design, project_dir.parents[1], style, count, ext_glyphs)
 
-    table = project_font_table(block_name)
+    table = font.project_font_table(block["name"])
     exist = "Overwritten" if table.is_file() else "Generated"
     with as_file(table) as image_file:
         sheet.save(image_file)
@@ -100,7 +123,7 @@ def generate(block_name: str, block: UnicodeBlock, assets: ImageAssets):
 
     create_project(project, False)
 
-    extension: Traversable = ext_glyphs_yml(block_name)
+    extension: Traversable = font.ext_glyphs_yml(block["name"])
     if extension.is_file():
         glyphs_yml = parse_extra_glyphs(load_yaml(extension))
         columns = glyphs_yml["column"]
@@ -110,10 +133,10 @@ def generate(block_name: str, block: UnicodeBlock, assets: ImageAssets):
             cell = null_cell if glyphs[i].is_undefined() else font_cell
             return get_extra_glyph_label(i), cell, glyphs[i].cmap
 
-        print(f"{len(glyphs)} glyphs Extension feature found for '{block_name}' unicode range")
+        print(f"{len(glyphs)} glyphs Extension feature found for '{block["name"]}' unicode range")
 
         sheet = generate_font_table(fn, label_font, len(glyphs), unifont_hex, columns)
-        table = project_ext_font_table(block_name)
+        table = font.project_ext_font_table(block["name"])
         exist = "Overwritten" if table.is_file() else "Generated"
         with as_file(table) as image_file:
             sheet.save(image_file)
@@ -141,7 +164,8 @@ class ImageAssets(TypedDict):
 
 def main():
     unicode_blocks = load_unicode_blocks()
-    project = load_yaml(project_yml())
+    project = load_yaml(font.project_yml())
+    config: FontYML = load_yaml(font.font_yml())
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -150,12 +174,21 @@ def main():
         help="Unicode block identifier (default: generate all configured blocks)",
     )
 
+    family_options: list[str] = config["typeface"]["family"]
+    parser.add_argument(
+        "-f", "--family",
+        nargs="+",
+        default=family_options,
+        choices=family_options,
+        help="Family name to generate (default: Generate all available family)",
+    )
+
     # Load all assets we will need for font table generation
-    with ((ASSETS_DIR / CELL_64).open("rb") as cell_64,
-        (ASSETS_DIR / NULL_64).open("rb") as null_64,
-        (ASSETS_DIR / FONT16_REGULAR).open("rb") as font_16px,
-        (ASSETS_DIR / FONT_CONDENSED).open("rb") as font_16cd,
-        (ASSETS_DIR / UNIFONT).open("r") as unifont):
+    with ((font.ASSETS_DIR / CELL_64).open("rb") as cell_64,
+        (font.ASSETS_DIR / NULL_64).open("rb") as null_64,
+        (font.ASSETS_DIR / FONT16_REGULAR).open("rb") as font_16px,
+        (font.ASSETS_DIR / FONT_CONDENSED).open("rb") as font_16cd,
+        (font.ASSETS_DIR / UNIFONT).open("r") as unifont):
         image_assets: ImageAssets = {
             "font_cell": Image.open(cell_64).convert("RGBA"),
             "null_cell": Image.open(null_64).convert("RGBA"),
@@ -168,15 +201,21 @@ def main():
     if args.block:
         if args.block not in unicode_blocks:
             raise ValueError(f"Unknown Unicode block '{args.block}'")
-        generate(args.block, unicode_blocks[args.block], image_assets)
+        generate(unicode_blocks[args.block],
+                 image_assets,
+                 families=set(args.family),
+                 styles=config["typeface"]["style"])
         return
 
     for block_id in project["blocks"]:
         if block_id not in unicode_blocks:
             raise ValueError(
-                f"'{block_id}' referenced in project.yml but not found in unicode-blocks.json"
-            )
-        generate(block_id, unicode_blocks[block_id], image_assets)
+                f"'{block_id}' referenced in project.yml "
+                f"but not found in unicode-blocks.json")
+        generate(unicode_blocks[block_id],
+                 image_assets,
+                 families=set(args.family),
+                 styles=config["typeface"]["style"])
 
 
 if __name__ == "__main__":

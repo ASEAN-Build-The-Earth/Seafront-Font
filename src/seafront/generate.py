@@ -9,6 +9,9 @@
 Project file generation code
 """
 from collections.abc import Callable
+from importlib.resources import as_file
+from importlib.resources.abc import Traversable
+from pathlib import Path
 from typing import TextIO
 
 from PIL import Image
@@ -26,6 +29,29 @@ COLUMN_SIZE: int = 16
 Seafront default column size for font design table. 
 We will format all font tables by 16 columns and x rows.
 """
+
+def generate_empty_graphics(file: Traversable,
+                            parent: Path,
+                            cells_count: int,
+                            column_size: int=COLUMN_SIZE) -> None:
+    """
+    Save an empty Transparent design image and same to file.
+
+    :param file: File location to save
+    :param parent: Parent path for debugging
+    :param cells_count: Cell count to determind image size
+    :param column_size: Column size to determind image size
+    :return: None, written to filesystem
+    """
+    with as_file(file) as saves:
+        row_size = (cells_count + column_size - 1) // column_size
+        sheet = Image.new(
+            "RGBA",
+            (column_size * CELL_SIZE, row_size * CELL_SIZE),
+            (255, 255, 255, 0),
+        )
+        sheet.save(saves)
+        print(f"Written Empty '{saves.relative_to(parent)}'")
 
 
 def generate_font_table(fn: Callable[[int], tuple[str, Sheet, int | None]],

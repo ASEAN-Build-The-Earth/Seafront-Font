@@ -77,7 +77,7 @@ def main():
     )
 
     parser.add_argument(
-        "-c", "--family",
+        "-f", "--family",
         default=family_options[0],
         choices=family_options,
         help="The family name to export",

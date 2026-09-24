@@ -33,7 +33,7 @@ class UnicodeProject(TypedDict):
 
 
 def find_design_layers(projects: list[UnicodeBlock],
-                       families: list[str]):
+                       families: set[str]):
     design_layers: list[UnicodeProject] = []
 
     for unicode_project in projects:
