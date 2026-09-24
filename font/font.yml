@@ -1,0 +1,127 @@
+# ========================
+# Available Fonts
+# ========================
+font:
+  # BTE Seafront
+  seafront:
+    design-version: "Version 1.000"
+    font-desc-name: ~
+    font-desc-info: "The standard Seafront font"
+    design-credits: > 
+      Lead designer: chr7s-c, tin. 
+      With contributions from the BuildTheEarth Community
+    unicode-blocks:
+      - "Basic Latin"
+    features-afdko:
+      parent-afdko: "features/seafront.fea"
+      includes-fea:
+        - "features/seafront/features.fea"
+    sample-text: |
+      The quick brown fox jumps over the lazy dog.
+      0 1 2 3 4 5 6 7 8 9 
+      A B C D E F G H I J K L M N O P Q R S T U V W X Y Z 
+      a b c d e f g h i j k l m n o p q r s t u v w x y z 
+      ! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ ` { | } ~
+  # BTE Seafront Thai
+  seafront-thai:
+    design-version: "Version 1.000"
+    font-desc-name: "Thai"
+    font-desc-info: "The Thai-script support of Seafront"
+    design-credits: > 
+      Lead designer: bkcom1234, chr7s-c, tin. 
+      With contributions from the BuildTheEarth Community.
+    unicode-blocks:
+      - "Basic Latin"
+      - "Thai"
+    features-afdko:
+      parent-afdko: "features/seafront-thai.fea"
+      includes-fea:
+        - "features/seafront-thai/features.fea"
+    sample-text: "\u0E01\u0E02\u0E03\u0E04\u0E05\u0E06\u0E07\u0E08\u0E09"
+# ========================
+# Typeface Metadata
+# ========================
+typeface:
+  family:
+    - "Seafront"
+    - "Seafront Square"
+  style:
+    regular: "Regular"
+    monospace: "Mono"
+    bold: "Bold"
+  info:
+    # ========================
+    # Foundry name - an identifying prefix for the font.
+    # Commonly it's a standard in which a font is created for, ex. TT for TrueType font.
+    # But its barely used anymore. We will use "BTE" as the our font identifying prefix.
+    # ========================
+    foundry-name: "BTE"
+    description: "A pixelated style typeface developed by the BuildTheEarth Community."
+    manufacturer: "ASEAN-BTE"
+    vendor-url: "https://github.com/ASEAN-Build-The-Earth/Seafront-Font"
+    designer-url: "https://buildtheearth.net/"
+# ========================
+# Font profile
+# All units per pixel
+# ========================
+profile:
+  # ========================
+  # Typography specific variables
+  # Do not change if necessary
+  # ========================
+  typography:
+    maximum-width: 30
+    origin-x: 22
+    origin-y: 16
+    x-height: 16
+    cap-height: 20
+    white-space: 10
+    right-padding: 3
+    italic-angle: -12
+    monospace-width: 16
+    # Default anchoring positions
+    anchors:
+      base:
+        above: 4
+        below: -4
+      mark:
+        above: 6
+        below: -6
+      mkmk:
+        above: 8
+        below: -8
+  # ========================
+  # Unit scaling
+  # Doesn't affect visually, but internally how each pixel is mapped on a font coordinate
+  # ========================
+  scale:
+    # Recommend 1024(768:256) UPM
+    # Base scale, fit on power of 2
+    base: 32
+    # Recommend 2000(1500:500) UPM
+    # Pixel positions will cleanly snap at 0, 100, 200, 300, ...
+    # in full pixels and 50, 150, 250, 350, ... in half pixels
+    half: 50
+    # Every pixel will snap at 0, 100, 200, 300
+    full: 100
+  # ========================
+  # The font's "Accent"
+  # Affect how the font is visually placed along typography line
+  # ascender - how many pixel the font usually occupied above typing baseline
+  # descender - how many pixel the font usually occupied below typing baseline
+  # ========================
+  # What make different are ratio per ascender:descender,
+  # recommended around 80%:20%, 75%:25%
+  accent:
+    # 32*32 Pixel Bitmap
+    base:
+      ascender: 24
+      descender: 8
+    # 40*40 Pixel Bitmap
+    half:
+      ascender: 30
+      descender: 10
+    # 48*48 Pixel Bitmap
+    full:
+      ascender: 34
+      descender: 14

@@ -1,0 +1,13 @@
+# ============================================================
+#
+# BTE Seafront Thai OpenType features parent file
+# Write global rules for the font family 'Seafront Thai'
+#
+# ============================================================
+
+languagesystem DFLT dflt;
+
+# AUTOMATIC: Features inclusion is generated during font export task (export_seafront.py)
+# Path relative to wherever export_seafront.py is ran
+# include(path/to/font/features/seafront/features.fea);
+# include(path/to/font/features/seafront-thai/features.fea);

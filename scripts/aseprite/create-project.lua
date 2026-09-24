@@ -10,11 +10,23 @@ https://openfontlicense.org
 ------------------------------------------------------------
 -- create-project.lua
 --
+-- Generate or Overwrite the project design file 'design.aseprite'
+-- or extension design file 'ext-design.aseprite'.
+--
 -- Usage:
--- aseprite --batch --script create-project.lua --script-param dir=src/Basic\ Latin
+--
+-- aseprite --batch
+--          --script-param dir="/path/to/projects/{name}" \
+--          --script-param config="/path/to/font/" \
+--          --script-param ext="False"|"True",
+--          --script /path/to/scripts/aseprite/create-graphics.lua
 ------------------------------------------------------------
+---@alias Sprite any aseprite [sprite](https://www.aseprite.org/api/sprite) object
+---@alias Layer any aseprite [layer](https://www.aseprite.org/api/layer) object
+---@alias Design { style: string, layer: Layer }
 
 local dir = app.params["dir"]
+local ext = app.params["ext"]
 local config = app.params["config"]
 
 if not dir then
@@ -24,20 +36,25 @@ if not config then
     error("Missing script parameter: config")
 end
 
-local fontTablePath = dir .. "/font-table.png"
-local designPath = dir .. "/design/"
-local outputPath = dir .. "/design.aseprite"
-local configPath = config .. "/font.yml"
+local is_extension = ext and (ext == "True" and true or false) or false
+local projectsPath = "projects"
+local extParentPath = is_extension and "ext-" or ""
+local fontTablePath = app.fs.joinPath(dir, extParentPath .. "font-table.png")
+local outputPath = app.fs.joinPath(dir, extParentPath .. "design.aseprite")
+local designPath = app.fs.joinPath(dir, "design")
+local configPath = app.fs.joinPath(config, "font.yml")
 
-simpleyaml = require("simpleyaml")
+simpleyaml = require("module.simpleyaml")
 
-local font = simpleyaml.parse_file(configPath, "typeface")
+---@type table<string, any> font.yml parsed config table
+local font = simpleyaml.parse_file(configPath, { root="typeface" })
 
 local tableSprite = app.open(fontTablePath)
 local width = tableSprite.width
 local height = tableSprite.height
 local colorMode = tableSprite.colorMode
 
+---@type Sprite new aseprite sprite
 local sprite = Sprite(width, height, colorMode)
 
 sprite.filename = outputPath
@@ -47,6 +64,10 @@ app.transaction(function()
     sprite:deleteLayer(sprite.layers[1])
 end)
 
+--- Load all available design images (.png) under a folder
+---
+---@param folder string The folder path to typeface design to look for
+---@return { families:  { name: string, designs: table<number, Design> } }
 function loadDesign(folder)
      local typeface = {
         families = {} -- name, designs
@@ -70,13 +91,18 @@ function loadDesign(folder)
             for _, path in ipairs(app.fs.listFiles(directory)) do
                 if path:lower():match("%.png$") then
                     local filename = app.fs.fileName(path)
-                    local style = filename:gsub("%.png$", "")
+                    local style = not is_extension
+                        and filename:gsub("%.png$", "")
+                        or filename:match("ext%-(.+)%.png$")
+                    local checked = is_extension and true or not style:match("^ext%-")
 
-                    print("Found: " .. style .. " For " .. familyName)
-                    table.insert(family.designs, {
-                        style = style,
-                        path = app.fs.joinPath(directory, path)
-                    })
+                    if style and checked then
+                        print("Found: " .. style .. " For " .. filename)
+                         table.insert(family.designs, {
+                            style = style,
+                            path = app.fs.joinPath(directory, path)
+                        })
+                    end
                 end
             end
         end
@@ -124,12 +150,12 @@ for _, family in ipairs(typeface.families) do
 
     for _, design in ipairs(family.designs) do
 
-        -- Design layer
+        ---@type Layer Empty design layer
         local designLayer = sprite:newLayer()
         local style = font.style[design.style]
         local isRegular = style == font.style.regular
 
-        designLayer.name = style
+        designLayer.name = not style and design.style or style
         designLayer.parent = familyGroup
 
         if not hasPrimaryLayer and isRegular then
@@ -170,4 +196,5 @@ sprite:setPalette(palette)
 
 sprite:saveAs(outputPath)
 
-print((exists and "Overwritten " or "Generated ") .. outputPath)
+local path = outputPath:match(projectsPath .. "(.*)$") or outputPath
+print((exists and "Overwritten '" or "Generated '") .. projectsPath .. path .. "'")
