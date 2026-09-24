@@ -9,7 +9,7 @@
 Font exporting implementations
 """
 from pathlib import Path
-from typing import TypedDict, Callable, Any, Generator, overload, Literal
+from typing import TypedDict, Callable
 
 from fontTools.fontBuilder import FontBuilder
 from importlib.resources import as_file
@@ -169,14 +169,13 @@ def export(export_fn: Callable[[str], Path],
                 pbm = ext_glyph_dir / f"{filename}.pbm"
                 if not pbm.is_file():
                     glyph_error = (
-                        f"Extra glyph PBM file '{pbm.name}' not found!\n"
-                        f"Required in ext-glyph.yml: '{glyphs.get_extra_glyph_label(index)}'"
-                    )
-                    print(f"\033[93m{glyph_error}\033[0m", file=stderr)
+                        f"Extra glyph {glyphs.get_extra_glyph_label(index)} "
+                        f"PBM file '{pbm.name}' not found!")
+                    log(v, f"\033[93m{glyph_error}\033[0m")
                     continue
 
                 log(v, f"Building Extra Glyph: {index} (EXT-{index:02X})")
-                built += build_glyph(pbm, glyph, glyph_profile, name=ext_glyph.name, cmap=ext_glyph.cmap)
+                built += build_glyph(pbm, glyph, glyph_profile, name=filename, cmap=ext_glyph.cmap)
     except Exception as e:
         print(f"{'\033[93m'}Exception when collecting glyphs:\n{e}{'\033[0m'}", file=stderr)
     if unicode_missing is not None:
@@ -349,4 +348,4 @@ def export(export_fn: Callable[[str], Path],
     export_file = export_fn(post_script)
     fb.save(export_file)
 
-    print(f"Wrote: {export_file}")
+    print(f"\033[32mWrote: {export_file}")

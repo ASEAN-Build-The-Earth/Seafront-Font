@@ -83,7 +83,8 @@ def generate(block: UnicodeBlock,
              assets: ImageAssets,
              *,
              families: set[str],
-             styles: list[str] | dict[str, Any]):
+             styles: list[str] | dict[str, Any],
+             verbose: bool):
     font_cell: Sheet = assets["font_cell"]
     null_cell: Sheet = assets["null_cell"]
     unifont_hex: dict[int, bytes] = assets["unifont_hex"]
@@ -119,9 +120,9 @@ def generate(block: UnicodeBlock,
     exist = "Overwritten" if table.is_file() else "Generated"
     with as_file(table) as image_file:
         sheet.save(image_file)
-        print(f"{exist} '{image_file.relative_to(project_dir.parents[1])}'")
+        print(f"{exist} \33[33m'{image_file.relative_to(project_dir.parents[1])}'\33[0m")
 
-    create_project(project, False)
+    create_project(project, False, verbose)
 
     extension: Traversable = font.ext_glyphs_yml(block["name"])
     if extension.is_file():
@@ -133,16 +134,18 @@ def generate(block: UnicodeBlock,
             cell = null_cell if glyphs[i].is_undefined() else font_cell
             return get_extra_glyph_label(i), cell, glyphs[i].cmap
 
-        print(f"{len(glyphs)} glyphs Extension feature found for '{block["name"]}' unicode range")
+        if verbose:
+            print(f"{len(glyphs)} glyphs Extension feature found "
+                  f"for '{block["name"]}' unicode range")
 
         sheet = generate_font_table(fn, label_font, len(glyphs), unifont_hex, columns)
         table = font.project_ext_font_table(block["name"])
         exist = "Overwritten" if table.is_file() else "Generated"
         with as_file(table) as image_file:
             sheet.save(image_file)
-            print(f"{exist} Extension '{image_file.relative_to(project_dir.parents[1])}'")
+            print(f"{exist} Extension \33[33m'{image_file.relative_to(project_dir.parents[1])}'\33[0m")
 
-        create_project(project, True)
+        create_project(project, True, verbose)
 
 
 class ImageAssets(TypedDict):
@@ -170,17 +173,21 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "block",
-        nargs="?",
+        nargs="*",
         help="Unicode block identifier (default: generate all configured blocks)",
+    )
+    parser.add_argument('-v', "--verbose",
+        action="store_true",
+        help="log verbose outputs"
     )
 
     family_options: list[str] = config["typeface"]["family"]
     parser.add_argument(
         "-f", "--family",
         nargs="+",
-        default=family_options,
+        default=[family_options[0]],
         choices=family_options,
-        help="Family name to generate (default: Generate all available family)",
+        help="Family name to generate (default: Only generate 'Seafront' Family)"
     )
 
     # Load all assets we will need for font table generation
@@ -198,24 +205,33 @@ def main():
         }
 
     args = parser.parse_args()
-    if args.block:
-        if args.block not in unicode_blocks:
-            raise ValueError(f"Unknown Unicode block '{args.block}'")
-        generate(unicode_blocks[args.block],
-                 image_assets,
-                 families=set(args.family),
-                 styles=config["typeface"]["style"])
+    if isinstance(args.block, list) and len(args.block) > 0:
+        for i, block_name in enumerate(args.block):
+            if block_name not in unicode_blocks:
+                raise ValueError(f"Unknown Unicode block '{block_name}'")
+            print(f"\033[32m================= \033[1m"
+                  f"Generating {i + 1}/{len(args.block)} '{block_name}'\033[0m "
+                  f"\033[32m=================\033[0m")
+            generate(unicode_blocks[block_name],
+                     image_assets,
+                     families=set(args.family),
+                     styles=config["typeface"]["style"],
+                     verbose=args.verbose)
         return
 
-    for block_id in project["blocks"]:
-        if block_id not in unicode_blocks:
+    for i, block_name in enumerate(project["blocks"]):
+        if block_name not in unicode_blocks:
             raise ValueError(
-                f"'{block_id}' referenced in project.yml "
+                f"'{block_name}' referenced in project.yml "
                 f"but not found in unicode-blocks.json")
-        generate(unicode_blocks[block_id],
+        print(f"\033[32m================= \033[1m"
+              f"Generating {i + 1}/{len(project["blocks"])} '{block_name}'\033[0m "
+              f"\033[32m=================\033[0m")
+        generate(unicode_blocks[block_name],
                  image_assets,
                  families=set(args.family),
-                 styles=config["typeface"]["style"])
+                 styles=config["typeface"]["style"],
+                 verbose=args.verbose)
 
 
 if __name__ == "__main__":

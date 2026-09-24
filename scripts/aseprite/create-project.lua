@@ -20,6 +20,9 @@ https://openfontlicense.org
 --          --script-param config="/path/to/font/" \
 --          --script-param ext="False"|"True",
 --          --script /path/to/scripts/aseprite/create-graphics.lua
+--
+-- Optional params:
+--   --script-param verbose: Enable verbose logging
 ------------------------------------------------------------
 ---@alias Sprite any aseprite [sprite](https://www.aseprite.org/api/sprite) object
 ---@alias Layer any aseprite [layer](https://www.aseprite.org/api/layer) object
@@ -28,6 +31,7 @@ https://openfontlicense.org
 local dir = app.params["dir"]
 local ext = app.params["ext"]
 local config = app.params["config"]
+local verbose = app.params["verbose"] and true or false
 
 if not dir then
     error("Missing script parameter: dir")
@@ -74,16 +78,17 @@ function loadDesign(folder)
     }
 
     -- For each sub directory in design folder
-    for _, path in ipairs(app.fs.listFiles(folder)) do
+    for _, familyName in ipairs(app.fs.listFiles(folder)) do
         -- The path name will annotate the font family name
-        local familyName = path
         local directory = app.fs.joinPath(folder, familyName)
         local family = {
             name = familyName, -- string
             designs = {} -- style, path
         }
 
-        print("Path: " .. directory)
+        if verbose then
+            print("Generating to path: " .. directory)
+        end
 
         if not app.fs.isDirectory(directory) then
             print("WARNING: Missing family directory: " .. directory)
@@ -97,8 +102,11 @@ function loadDesign(folder)
                     local checked = is_extension and true or not style:match("^ext%-")
 
                     if style and checked then
-                        print("Found: " .. style .. " For " .. filename)
-                         table.insert(family.designs, {
+                        if verbose then
+                            print("Found: '"  .. filename ..
+                                "' for " .. familyName .. " ".. font.style[style])
+                        end
+                        table.insert(family.designs, {
                             style = style,
                             path = app.fs.joinPath(directory, path)
                         })
@@ -197,4 +205,4 @@ sprite:setPalette(palette)
 sprite:saveAs(outputPath)
 
 local path = outputPath:match(projectsPath .. "(.*)$") or outputPath
-print((exists and "Overwritten '" or "Generated '") .. projectsPath .. path .. "'")
+print((exists and "Overwritten \27[33m'" or "Generated \27[33m'") .. projectsPath .. path .. "'\27[0m")

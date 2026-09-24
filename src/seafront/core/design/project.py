@@ -12,14 +12,14 @@ from importlib.resources import as_file
 from importlib.resources.abc import Traversable
 from sys import stderr
 from PIL import Image
-from typing import TypedDict, Literal, ReadOnly, Any
+from typing import TypedDict, Iterable, ReadOnly
 
 import yaml
 import seafront.font as font
 import seafront.model.glyphs as glyphs
 
 from seafront.core.design.graphics import export_graphics
-from seafront.model.font import FontProfile
+from seafront.model.font import FontProfile, TypefaceStyles
 from seafront.model.glyphs import get_glyph_label
 from seafront.unicode import UnicodeBlock
 
@@ -30,6 +30,11 @@ class UnicodeProject(TypedDict):
     start: ReadOnly[int]
     end: ReadOnly[int]
     ext: glyphs.ExtraGlyphsList | None
+
+
+class SavesResult(TypedDict):
+    uni: int
+    ext: int
 
 
 def find_design_layers(projects: list[UnicodeBlock],
@@ -58,13 +63,15 @@ def find_design_layers(projects: list[UnicodeBlock],
 def save_unicode_glyphs(image: Traversable,
                         glyph_dir: Traversable,
                         profile: FontProfile,
-                        codepoint: int) -> int:
-    print(f"Saving {image.name}")
+                        codepoint: int,
+                        verbose: bool) -> int:
+    if verbose:
+        print(f"Saving {image.name}")
 
     with as_file(glyph_dir) as glyph_path, image.open("rb") as io:
         glyph_path.mkdir(exist_ok=True, parents=True)
         sheet = Image.open(io)
-        return export_graphics(get_glyph_label, sheet, glyph_path, profile, codepoint)
+        return export_graphics(get_glyph_label, sheet, glyph_path, profile, verbose, codepoint)
 
 
 def check_extra_glyphs(block_name: str) -> glyphs.ExtraGlyphsList | None:
@@ -79,26 +86,30 @@ def check_extra_glyphs(block_name: str) -> glyphs.ExtraGlyphsList | None:
 def save_extra_glyphs(image: Traversable,
                       glyph_dir: Traversable,
                       profile: FontProfile,
-                      ext_glyphs: glyphs.ExtraGlyphsList) -> int:
+                      ext_glyphs: glyphs.ExtraGlyphsList,
+                      verbose: bool) -> int:
+    if verbose:
+        print(f"Saving {image.name}")
+
     def name_fn(index: int) -> str:
         glyph: glyphs.ExtraGlyph =  ext_glyphs.get("glyphs")[index]
 
         if (ext_name := glyph.get_glyph_name()) is None:
             ext_name = glyphs.get_extra_glyph_label(index)
-            print(f"{'\033[31m'}WARNING: Extra glyph '{ext_name}' "
-                  f"has no configured name.{'\033[0m'}", file=stderr)
+            print(f"{'\033[31m'}WARNING: Unnamed Extra glyph '{ext_name}'", file=stderr)
 
         return ext_name
 
     with as_file(glyph_dir) as glyph_path, image.open("rb") as io:
         glyph_path.mkdir(exist_ok=True, parents=True)
         sheet = Image.open(io)
-        return export_graphics(name_fn, sheet, glyph_path, profile)
+        return export_graphics(name_fn, sheet, glyph_path, profile, verbose)
 
 
 def save_glyphs(design_layer: UnicodeProject,
-                styles: list[str] | dict[str, Any],
-                font_profile: FontProfile) -> dict[str, dict[Literal["uni", "ext"], int]]:
+                styles: Iterable[TypefaceStyles],
+                font_profile: FontProfile,
+                verbose: bool) -> dict[TypefaceStyles, SavesResult]:
     block: str = design_layer["block_name"]
     start: int = design_layer["start"]
     family: str = design_layer["family_name"]
@@ -117,13 +128,13 @@ def save_glyphs(design_layer: UnicodeProject,
         saved = {}
         if image.is_file():
             glyph_dir = font.project_glyphs(block, family, style)
-            saved["uni"] = save_unicode_glyphs(image, glyph_dir, font_profile, start)
+            saved["uni"] = save_unicode_glyphs(image, glyph_dir, font_profile, start, verbose)
 
         ext_style = f"{glyphs.EXT_PREFIX}{style}"
         ext_image = design / f"{ext_style}.png"
         if (ext_glyphs is not None) and ext_image.is_file():
             glyph_dir = font.project_glyphs(block, family, ext_style)
-            saved["ext"] = save_extra_glyphs(ext_image, glyph_dir, font_profile, ext_glyphs)
+            saved["ext"] = save_extra_glyphs(ext_image, glyph_dir, font_profile, ext_glyphs, verbose)
         result[style] = saved
 
     return result

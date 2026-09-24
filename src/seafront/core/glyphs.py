@@ -94,12 +94,7 @@ def build_glyph(pbm: Traversable,
     else:
         # Else, glyph name must be specified
         if name is None:
-            print(
-                f"{'\033[93m'}Non-unicode glyph for:\n{pbm}"
-                f"\n require name to be set in its profile{'\033[0m'}",
-                file=stderr
-            )
-            return 0
+            raise ValueError(f"Unnamed non-unicode glyph\n{pbm.name}")
         is_extension = True
         glyph_name = name
 
@@ -142,7 +137,7 @@ def build_glyph(pbm: Traversable,
         if w != pbm_cell or h != pbm_cell:
             raise ValueError(
                 f"Glyphs .pbm has mismatch accent dimension. "
-                f"Expected {pbm_cell}*{pbm_cell}, Got {w}*{h} at:\n'{pbm}'"
+                f"Expected {pbm_cell}*{pbm_cell}, Got {w}*{h} in: '{pbm.name}'"
             )
         pixels = bitmap.load()
 

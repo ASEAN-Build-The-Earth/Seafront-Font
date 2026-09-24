@@ -13,6 +13,7 @@ pathlib to be sure aseprite file won't mistake it
 """
 from importlib.resources import as_file
 from importlib.resources.abc import Traversable
+from pathlib import Path
 from sys import stderr
 
 import seafront.font as font
@@ -28,11 +29,13 @@ ASEPRITE_CREATE: str = "aseprite/create-project.lua"
 """aseprite project generation script"""
 
 
-def save_graphics(aseprite_file: Traversable) -> bool:
+def save_graphics(aseprite_file: Traversable,
+                  verbose: bool=False) -> bool:
     """
     Spin a subprocess to run :code:`/scripts/aseprite/save-graphics.lua`
 
     :param aseprite_file: The aseprite file to save graphics
+    :param verbose: Pass verbose flag to the script
     :raise CalledProcessError If an error occurred inside the executing script
     :raise OSError If aseprite is not available in the system
     :return: Boolean when the script finished running
@@ -41,12 +44,17 @@ def save_graphics(aseprite_file: Traversable) -> bool:
         with (as_file(aseprite_file) as file,
               as_file(font.SCRIPTS_DIR / ASEPRITE_SAVE) as script,
               as_file(font.FONT_DIR) as config):
-            subprocess.run([
-                "aseprite",
-                "--batch", file,
-                "--script-param", f"config={config}",
-                "--script", script,
-            ], check=True)
+            cli = ["aseprite", "--batch", file,
+                   "--script-param", f"config={config}"]
+
+            if verbose:
+                cli.append("--script-param")
+                cli.append(f"verbose=true")
+
+            cli.append("--script")
+            cli.append(script)
+
+            subprocess.run(cli, check=True)
             return True
     except subprocess.CalledProcessError as internal_error:
         print(f"{'\033[93m'}Internal error saving "
@@ -58,12 +66,15 @@ def save_graphics(aseprite_file: Traversable) -> bool:
 
 
 def export_graphics(aseprite_file: Traversable,
-                    start_codepoint: int) -> bool:
+                    start_codepoint: int,
+                    verbose: bool=False) -> bool:
     """
     Spin a subprocess to run :code:`/scripts/aseprite/export-graphics.lua`
 
     :param aseprite_file: The aseprite file to export graphics
+    :param verbose: Pass verbose flag to the script
     :param start_codepoint: Unicode start codepoint of the project's annoting this aseprite file
+    :param verbose: Pass verbose flag to the script
     :raise CalledProcessError If an error occurred inside the executing script
     :raise OSError If aseprite is not available in the system
     :return: Boolean when the script finished running
@@ -72,13 +83,19 @@ def export_graphics(aseprite_file: Traversable,
         with (as_file(aseprite_file) as file,
               as_file(font.SCRIPTS_DIR / ASEPRITE_EXPORT) as script,
               as_file(font.FONT_DIR) as config):
-            subprocess.run([
-                "aseprite",
-                "--batch", file,
-                "--script-param", f"config={config}",
-                "--script-param", f"codepoint={start_codepoint:04X}",
-                "--script", script,
-            ], check=True)
+            cli = ["aseprite", "--batch", file,
+                   "--script-param", f"config={config}",
+                   "--script-param", f"codepoint={start_codepoint:04X}"]
+
+            if verbose:
+                print("Exporting verbose")
+                cli.append("--script-param")
+                cli.append(f"verbose=true")
+
+            cli.append("--script")
+            cli.append(script)
+
+            subprocess.run(cli, check=True)
             return True
     except subprocess.CalledProcessError as internal_error:
         print(f"{'\033[93m'}Internal error exporting "
@@ -90,28 +107,38 @@ def export_graphics(aseprite_file: Traversable,
 
 
 def create_project(project_dir: Traversable,
-                   is_extension: bool) -> bool:
+                   is_extension: bool,
+                   verbose: bool=False) -> bool:
     """
     Spin a subprocess to run :code:`/scripts/aseprite/create-project.lua`
 
     :param project_dir: The directory path, must be convertible to Path object
     :param is_extension: Is the project an extension project (ext-design.aseprite)
+    :param verbose: Pass verbose flag to the script
     :raise CalledProcessError If an error occurred inside the executing script
     :raise OSError If aseprite is not available in the system
     :return: Boolean when the script finished running
     """
     try:
         with (as_file(project_dir) as project,
-              as_file(font.SCRIPTS_DIR / ASEPRITE_CREATE) as scripts,
+              as_file(font.SCRIPTS_DIR / ASEPRITE_CREATE) as script,
               as_file(font.FONT_DIR) as config):
-            subprocess.run([
+            cli: list[str | Path] = [
                 "aseprite",
                 "--batch",
                 "--script-param", f"dir={project}",
                 "--script-param", f"config={config}",
-                "--script-param", f"ext={is_extension}",
-                "--script", scripts,
-            ], check=True)
+                "--script-param", f"ext={is_extension}"
+            ]
+            if verbose:
+                print("Exporting verbose")
+                cli.append("--script-param")
+                cli.append(f"verbose=true")
+
+            cli.append("--script")
+            cli.append(script)
+
+            subprocess.run(cli, check=True)
             return True
     except subprocess.CalledProcessError as internal_error:
         print(f"{'\033[93m'}Internal error generating "

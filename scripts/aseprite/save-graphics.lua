@@ -17,6 +17,9 @@ https://openfontlicense.org
 -- aseprite --batch "/path/to/projects/{name}/design.aseprite" \
 --          --script-param config="/path/to/font/" \
 --          --script /path/to/scripts/aseprite/save-graphics.lua
+--
+-- Optional params:
+--   --script-param verbose: Enable verbose logging
 ------------------------------------------------------------
 ---@alias Sprite any aseprite [sprite](https://www.aseprite.org/api/sprite) object
 ---@alias Layer any aseprite [layer](https://www.aseprite.org/api/layer) object
@@ -25,6 +28,7 @@ https://openfontlicense.org
 ---@alias DesignLayers table<number, { style: string, layer: Layer }>
 
 local config = app.params["config"]
+local verbose = app.params["verbose"] and true or false
 
 if not config then
     error("Missing script parameter: config")
@@ -59,7 +63,9 @@ for _, family in ipairs(font.family) do
 		goto cont_save_graphics
 	end
 
-	print("Saving " .. family)
+	if verbose then
+		print("Saving " .. family .. "...")
+	end
 
     for _, design in ipairs(layers) do
 		local style = design.style --[[@as number]]
@@ -73,7 +79,9 @@ for _, family in ipairs(font.family) do
 
 		if mkdir then
 			local mkdirPath = out:match(projectsPath .. "(.*)$") or out
-			print("Using directory: '" .. projectsPath .. mkdirPath .. "'")
+			if verbose then
+				print("Using directory: '" .. projectsPath .. mkdirPath .. "'")
+			end
 		end
 
 		if cel then
@@ -92,8 +100,11 @@ for _, family in ipairs(font.family) do
 				image:drawImage(sourceImage, Point(imageX, imageY))
 				image:saveAs(path)
 
-				local imagePath = path:match(projectsPath .. "(.*)$") or path
-				print("Saved '" .. projectsPath .. imagePath .. "'")
+				if verbose then
+					local imagePath = path:match(projectsPath .. "(.*)$") or path
+					print("Saved '" .. projectsPath .. imagePath .. "'")
+				end
+				print("Saved " .. family .. " " .. font.style[style])
 			else
 				err = "Image not found inside graphic layer"
 			end

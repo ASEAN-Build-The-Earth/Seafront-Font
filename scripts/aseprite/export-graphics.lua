@@ -217,8 +217,9 @@ local function exportGraphic(design, family)
                 graphics.savePBM(1, image, pbm_file)
                 built = built + 1
                 if verbose then
-                    print("Wrote: (" .. string.format(
-                        "U+%04X", glyph_unicode) .. "): " .. pbm_file)
+                    local pbmPath = pbm_file:match(projectsPath .. "(.*)$") or pbm_file
+                    print("Wrote: (" .. string.format("U+%04X", glyph_unicode)
+                            .. "): '" .. projectsPath .. pbmPath .. "'")
                 end
             end
         elseif verbose then

@@ -51,7 +51,7 @@ def generate_empty_graphics(file: Traversable,
             (255, 255, 255, 0),
         )
         sheet.save(saves)
-        print(f"Written Empty '{saves.relative_to(parent)}'")
+        print(f"Wrote Empty \33[33m'{saves.relative_to(parent)}'\33[0m")
 
 
 def generate_font_table(fn: Callable[[int], tuple[str, Sheet, int | None]],
