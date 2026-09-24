@@ -75,7 +75,7 @@ function glyphs.parseExtraGlyphs(extGlyphs)
 
     local size = math.min(#glyphsYaml, MAX_EXTRA_GLYPHS)
     local availableIndexes = {} -- Available indexes.
-    local glyphs = {} -- Result indexed by extra glyph index.
+    local glyphsTable = {} -- Result indexed by extra glyph index.
     local unknownKeys = {}
 
     for i = 0, size - 1 do
@@ -95,7 +95,7 @@ function glyphs.parseExtraGlyphs(extGlyphs)
         if type(item) ~= "table" or #item > 0 then
             local glyph = getExtraGlyph(item)
             if #availableIndexes > 0 then
-                glyphs[i] = glyph
+                glyphsTable[i] = glyph
                 table.remove(availableIndexes, 1)
             else
                 local key = glyphs.getExtraGlyphLabel(i - 1)
@@ -143,7 +143,7 @@ function glyphs.parseExtraGlyphs(extGlyphs)
             end
 
             if found then
-                glyphs[index + 1] = glyph
+                glyphsTable[index + 1] = glyph
             else -- If none found, treat this as an unknown key.
                 unknownKeys[#unknownKeys + 1] = { key = key, glyph = glyph }
             end
@@ -172,7 +172,7 @@ function glyphs.parseExtraGlyphs(extGlyphs)
             label
         ))
 
-        glyphs[index + 1] = entry.glyph
+        glyphsTable[index + 1] = entry.glyph
     end
 
     -- If there's still unknown key(s) after filling all availableIndexes,
@@ -184,7 +184,7 @@ function glyphs.parseExtraGlyphs(extGlyphs)
         ))
     end
 
-    return glyphs
+    return glyphsTable
 end
 
 return glyphs
