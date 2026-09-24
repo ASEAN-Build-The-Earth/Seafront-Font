@@ -28,6 +28,21 @@ from seafront.model.font import FontYML, TypefaceData, FontMetric, TypefaceStyle
 import argparse
 import yaml
 
+ADVANCED_OPTIONS = """
+\033[1m\033[95madvanced options:\033[0m
+  \033[1m\033[32m-i\033[0m, \033[1m\033[96m--identifier \33[33m[IDENTIFIER]\033[0m
+                        The font's version number to export, formatted as 3 decimals float ex. 1.000
+  \033[1m\033[32m-s\033[0m, \033[1m\033[96m--scale \33[33m{base,half,full}\033[0m
+                        The scale preset that affect the font's internal positioning.
+                        Default to 'base'
+  \033[1m\033[32m-a\033[0m, \033[1m\033[96m--accent \33[33m{base,half,full}\033[0m
+                        The accent preset of this font which define the ascent
+                        and descend line of this font, Default to 'base'
+  \033[1m\033[32m-f\033[0m, \033[1m\033[96m--family \33[33m{Seafront,Seafront Square}\033[0m
+                        The family name to export
+"""
+"""Advanced options as epilog help message, not really intended for casual use cases."""
+
 
 def main():
     with font_yml().open(encoding="utf-8") as io:
@@ -35,37 +50,34 @@ def main():
 
     parser = argparse.ArgumentParser(
         description="Export a TrueType font from this project",
-        formatter_class=argparse.RawTextHelpFormatter
-    )
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog=ADVANCED_OPTIONS)
 
     typeface_options: list[TypefaceStyles] = [*config["typeface"]["style"]]
     accent_options: list[FontMetric] = [*config["profile"]["accent"]]
     family_options: list[str] = config["typeface"]["family"]
 
     parser.add_argument('-v', "--verbose",
-        default=False, const=True,
-        type=bool, nargs="?",
+        action="store_true",
         help="log verbose outputs",
     )
 
     parser.add_argument('-i', "--identifier",
         nargs="?",
         type=float,
-        help="The font's version number to export, formatted as 3 decimals float ex. 1.000",
+        help=argparse.SUPPRESS,
     )
 
     parser.add_argument('-s', "--scale",
         default=accent_options[0],
         choices=accent_options,
-        help="The scale preset that affect the font's internal positioning.\n"
-             f"Default to '{accent_options[0]}'",
+        help=argparse.SUPPRESS,
     )
 
     parser.add_argument('-a', "--accent",
         default=accent_options[0],
         choices=accent_options,
-        help="The accent preset of this font which define the ascent\n"
-             f"and descend line of this font, Default to '{accent_options[0]}'",
+        help=argparse.SUPPRESS,
     )
 
     parser.add_argument(
@@ -80,11 +92,11 @@ def main():
         "-f", "--family",
         default=family_options[0],
         choices=family_options,
-        help="The family name to export",
+        help=argparse.SUPPRESS,
     )
 
-    # Positional Arguments
-    # export_seafront.py {font_options} {output_filename}
+    # Exports arguments
+    # export-seafront [-o [OUTPUT]] (-b | {seafront,seafront-thai} ...)
 
     available_font = {k: v["font-desc-info"] for k, v in config["font"].items()}
     font_desc_text = "\n".join(f"- \033[1m\033[32m{key:<8}\033[0m : {val}" for key, val in available_font.items())
@@ -92,9 +104,14 @@ def main():
     font_help_text = "\n".join(["Which font to export? (Required):", font_desc_text, font_hint_text])
     file_help_text = "Output file name *.ttf, default to the psName of exporting font."
 
-    parser.add_argument("font", choices=available_font, help=font_help_text)
+    parser.add_argument("-o", "--output", nargs="?", help=file_help_text)
 
-    parser.add_argument("output", nargs="?", help=file_help_text)
+    font_option = parser.add_mutually_exclusive_group(required=True)
+    font_option.add_argument("font", nargs="*", choices=available_font, help=font_help_text)
+    font_option.add_argument('-b', "--batch",
+        action="store_true",
+        help="Export ALL fonts (batch export)",
+    )
 
     args = parser.parse_args()
 
@@ -145,7 +162,6 @@ def main():
         "accent": config["profile"]["accent"][accent],
         "verbose": args.verbose
     }
-    data: FontData = config["font"][args.font]
 
     if args.verbose:
         print("Export Profile: ", font, profile)
@@ -162,7 +178,18 @@ def main():
             export_path.mkdir(exist_ok=True)
             return export_path / filename
 
-    export(export_fn, font, data, profile)
+    def export_fonts(fonts: dict[str, str] | list[str]):
+        for i, font_name in enumerate(fonts):
+            data: FontData = config["font"][font_name]
+            print(f"\33[33m================= \033[1m"
+                  f"Exporting {i + 1}/{len(fonts)} '{font_name}'\033[0m "
+                  f"\33[33m=================\033[0m")
+            export(export_fn, font, data, profile)
+
+    if args.batch:
+        export_fonts(available_font)
+    elif isinstance(args.font, list):
+        export_fonts(args.font)
 
 
 if __name__ == "__main__":

@@ -51,7 +51,8 @@ def export_graphics(
     source_img: Sheet,
     glyphs_dir: Path,
     profile: FontProfile,
-    codepoint: int | None=None
+    verbose: bool,
+    codepoint: int | None=None,
 ) -> int:
     """
     Mirrors aseprite script export-graphics.lua
@@ -60,6 +61,7 @@ def export_graphics(
     :param source_img: Source image to export graphics as
     :param glyphs_dir: The glyphs output directory for this image
     :param profile: Font profile for typography constants
+    :param verbose: Verbose logging
     :param codepoint: The Unicode point if existed
     :return: Number of exported glyphs from source image
     """
@@ -116,9 +118,9 @@ def export_graphics(
         #       to make Sheet.getbbox() returns None
         #       for all empty bitmap (Full white/transparent).
         if pixels is None or bitmap.getbbox() is None:
-            if isinstance(codepoint, int):
+            if verbose and isinstance(codepoint, int):
                 print(f"Skipped U+{codepoint + i:04X} (Empty)")
-            else:
+            elif verbose:
                 print(f"Skipped cell [{i}] (Empty)")
             continue
 
@@ -136,7 +138,8 @@ def export_graphics(
             name: str = name_fn(codepoint + i) if isinstance(codepoint, int) else name_fn(i)
             save_pbm(get_pixel, pbm_cell, pbm_cell, glyphs_dir / f"{name}.pbm")
             saved = saved + 1
-            print(f"Saved {name}.pbm")
+            if verbose:
+                print(f"Wrote: {name}.pbm")
         except (FileNotFoundError, PermissionError, OSError) as error:
             print(f"Error occurred: {error}")
 

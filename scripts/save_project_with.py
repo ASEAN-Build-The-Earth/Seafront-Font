@@ -38,35 +38,44 @@ def load_yaml(file: Traversable):
 
 
 class SaveOption(NamedTuple):
+    """
+    :ivar font: Font to save if picked (Mutually exclusive)
+    :ivar project: Save all in projects (Mutually exclusive)
+    :ivar unicode: Unicode to save if picked (Mutually exclusive)
+    :ivar verbose: Enable verbose logging or not
+    """
     font: list[UnicodeBlock] | None
     project: list[UnicodeBlock] | None
     unicode: list[UnicodeBlock] | None
-    family: list[str]
+    verbose: bool
 
 
-# 1. Define the handler functions for each subcommand
+class NamedSaveOption(SaveOption):
+    """:ivar name: Family name to export this save."""
+    name: list[str]
+
+
 def with_aseprite(args: SaveOption):
-
-    if args.font is not None:
-        aseprite(args.font)
-
-    if args.project is not None:
-        aseprite(args.project)
-
-    if args.unicode is not None:
-        aseprite(args.unicode)
+    if ((project := args.font) is not None or
+       (project := args.project) is not None or
+       (project := args.unicode) is not None):
+        aseprite(project, args.verbose)
 
 
-def with_png_image(args: SaveOption):
+def with_png_image(args: NamedSaveOption):
+    if ((project := args.font) is not None or
+       (project := args.project) is not None or
+       (project := args.unicode) is not None):
+        png_image(project, set(args.name), args.verbose)
 
-    if args.font is not None:
-        png_image(args.font, set(args.family))
 
-    if args.project is not None:
-        png_image(args.project, set(args.family))
-
-    if args.unicode is not None:
-        png_image(args.unicode, set(args.family))
+PNG_ADVANCED_OPTIONS = """
+\033[1m\033[95madvanced options:\033[0m
+  \033[1m\033[32m-n\033[0m, \033[1m\033[96m--name \33[33m{Seafront,Seafront Square} [NAME ...]\033[0m
+                        The family name to export
+"""
+""":code:`--name` flag is hidden by default for saving png, 
+as we dont have much designs to support multiple families yet."""
 
 
 def main():
@@ -84,10 +93,8 @@ def main():
 
     parent_parser = argparse.ArgumentParser(add_help=False)
     parent_parser.add_argument('-v', "--verbose",
-        default=False, const=True,
-        type=bool, nargs="?",
-        help="log verbose outputs",
-    )
+        action="store_true",
+        help="log verbose outputs")
 
     available_font = {k: v["font-desc-info"] for k, v in config["font"].items()}
     font_desc_text = "\n".join(f"- \033[1m\033[32m{key:<8}\033[0m : {val}" for key, val in available_font.items())
@@ -137,14 +144,15 @@ def main():
     # png-images command parser
     parser_png_image = subparsers.add_parser("png-image", parents=[parent_parser],
                                              help="Save with png image files",
-                                            formatter_class=argparse.RawTextHelpFormatter)
+                                             formatter_class=argparse.RawTextHelpFormatter,
+                                             epilog=PNG_ADVANCED_OPTIONS)
     parser_png_image.set_defaults(func=with_png_image)
     parser_png_image.add_argument(
-        "-f", "--family",
+        "-n", "--name",
         nargs="+",
         default=[family_options[0]],
         choices=family_options,
-        help="The family name to export",
+        help=argparse.SUPPRESS,
     )
 
     args = parser.parse_args()
