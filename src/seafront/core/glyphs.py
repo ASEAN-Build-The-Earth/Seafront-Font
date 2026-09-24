@@ -8,7 +8,7 @@
 """\
 Glyph exporting implementation
 """
-from pathlib import Path
+from importlib.resources.abc import Traversable
 from typing import Literal
 
 from PIL import Image
@@ -48,7 +48,7 @@ def draw_glyphs(pen: TTGlyphPen, paths: list[list[Edge]]):
         draw_glyph(simplified)
 
 
-def build_glyph(pbm: Path,
+def build_glyph(pbm: Traversable,
                 glyph: GlyphsTable,
                 profile: GlyphProfile,
                 *,
@@ -78,15 +78,6 @@ def build_glyph(pbm: Path,
 
     origin_x: int = pbm_cell - profile["typography"]["maximum-width"]
     origin_y: int = accent["ascender"]
-
-    image = Image.open(pbm)
-    w, h = image.size
-
-    if w != pbm_cell or h != pbm_cell:
-        raise ValueError(
-            f"Glyphs .pbm has mismatch accent dimension. "
-            f"Expected {pbm_cell}*{pbm_cell}, Got {w}*{h} at:\n'{pbm}'"
-        )
 
     # Glyph's identity
     # Standard uni0000 (:04X) Unicode glyph naming
@@ -144,9 +135,21 @@ def build_glyph(pbm: Path,
             x_anchor += int(positioning["pos"]["x"])
             y_anchor += int(positioning["pos"]["y"])
 
-    pixels = image.load()
-    fn = lambda x, y: pixels[x, y] if pixels is not None else 1
-    boundary = extract(fn, w, h, origin_x, origin_y + y_anchor, pixel_size)
+    with pbm.open("rb") as io:
+        bitmap = Image.open(io)
+        w, h = bitmap.size
+
+        if w != pbm_cell or h != pbm_cell:
+            raise ValueError(
+                f"Glyphs .pbm has mismatch accent dimension. "
+                f"Expected {pbm_cell}*{pbm_cell}, Got {w}*{h} at:\n'{pbm}'"
+            )
+        pixels = bitmap.load()
+
+    def get_pixel(x: int, y: int) -> float | tuple[int, ...] | int:
+        return pixels[x, y] if (pixels is not None) else 1
+
+    boundary = extract(get_pixel, w, h, origin_x, origin_y + y_anchor, pixel_size)
 
     if boundary is None:
         print(f"{'\033[93m'}Glyph for {glyph_name} is empty{'\033[0m'}", file=stderr)

@@ -52,8 +52,9 @@ testpaths = ["tests/*"]
 addopts = ["-v", "--doctest-modules", "src/seafront/unicode.py"] # rn only unicode.py have doctest
 
 [project.scripts]
+save-project-with = "scripts.save_project_with:main"
 generate-project = "scripts.generate_project:main"
-export-seafront  = "scripts.export_seafront:main"
+export-seafront = "scripts.export_seafront:main"
 
 [tool.hatch.build.targets.sdist]
 include = ["/seafront", "/src", "/script", "/font", "/assets"]

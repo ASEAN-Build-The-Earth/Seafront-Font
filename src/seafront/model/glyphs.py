@@ -20,10 +20,10 @@ from seafront.unicode import parse_codepoint
 
 class ExtraGlyph(NamedTuple):
     """
-    Glyph's horizontal metric
+    Extra glyph definition
 
-    :ivar name: Advance width of the glyph
-    :ivar cmap: left side bearing position of the glyph
+    :ivar name: The custom name of the glyph
+    :ivar cmap: Unicode codepoint map if this glyph is a Unicode glyph
     """
     name: str | None
     cmap: int | None
@@ -34,6 +34,14 @@ class ExtraGlyph(NamedTuple):
 
     def is_undefined(self):
         return self == (None, None)
+
+    def get_glyph_name(self) -> str | None:
+        if isinstance(self.name, str):
+            return self.name
+        elif isinstance(self.cmap, int):
+            return get_glyph_label(self.cmap)
+        else:
+            return None
 
 
 class ExtraGlyphsList(TypedDict):
@@ -128,6 +136,22 @@ def prepare_glyphs(default_width: int) -> GlyphsTable:
         "metrics": metrics,
         "cmap": cmap
     }
+
+UNI_PREFIX: Literal["uni"] = "uni"
+"""
+Prefix used in Unicode glyphs naming :code:`uni{index:04X}`.
+"""
+
+
+def get_glyph_label(codepoint: int) -> str:
+    """
+    Standard glyph uniXXXX label.
+
+    :param codepoint: Unicode codepoint integer of this glyph
+    :return: :code:`uni{index:02X}`: ext-00 to ext-FF
+    """
+    return f"{UNI_PREFIX}{codepoint:04X}"
+
 
 EXT_PREFIX: Literal["ext-"] = "ext-"
 """

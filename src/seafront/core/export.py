@@ -9,7 +9,7 @@
 Font exporting implementations
 """
 from pathlib import Path
-from typing import TypedDict, Callable
+from typing import TypedDict, Callable, Any, Generator, overload, Literal
 
 from fontTools.fontBuilder import FontBuilder
 from importlib.resources import as_file
@@ -23,14 +23,8 @@ from ..afdko.anchors import export_anchor_features
 from ..afdko.kerning import export_kerning_feat
 from ..model.anchors import parse_glyph_anchors, GlyphAnchors
 from ..model.font import TypefaceStyles, FontInfo, FontData, TypographyData, TypefaceAccent
-from ..model.glyphs import (prepare_glyphs,
-                            parse_extra_glyphs,
-                            GlyphsTable,
-                            GlyphProfile,
-                            EXT_PREFIX,
-                            ExtraGlyphsList,
-                            ExtraGlyph)
 
+import seafront.model.glyphs as glyphs
 import seafront.__about__ as about
 import seafront.font as font
 import yaml
@@ -101,7 +95,7 @@ def export(export_fn: Callable[[str], Path],
 
     family_name: str = font_export["info"]["family"]
     blocks: dict[str, UnicodeBlock] = load_unicode_blocks()
-    glyph: GlyphsTable = prepare_glyphs(units_per_em // 2)  # Defaulting half an em per glyph for .notdef
+    glyph: glyphs.GlyphsTable = glyphs.prepare_glyphs(units_per_em // 2)  # Defaulting half an em per glyph for .notdef
     built: int = 0
 
     anchors_feature: dict[str, GlyphAnchors] = {}
@@ -112,10 +106,11 @@ def export(export_fn: Callable[[str], Path],
         for block_name in font_data["unicode-blocks"]:
             face = font_export["face"]
 
-            with as_file(font.project_glyphs(block_name, family_name, face)) as glyph_dir:
-                if not glyph_dir.exists():
-                    unicode_missing = (block_name, rf"{glyph_dir}")
-                    continue
+            glyph_dir = font.project_glyphs(block_name, family_name, face)
+            if not glyph_dir.is_dir():
+                with as_file(glyph_dir) as missing_path:
+                    unicode_missing = (block_name, rf"{missing_path}")
+                continue
 
             anchors_yml: Traversable = font.anchors_yml(block_name)
             kerning_yml: Traversable = font.kerning_yml(block_name)
@@ -131,7 +126,7 @@ def export(export_fn: Callable[[str], Path],
 
             # Anchors positioning required to adjust each glyph if configured
             anchors: GlyphAnchors | None = load_anchors() if anchors_yml.is_file() else None
-            glyph_profile: GlyphProfile = {
+            glyph_profile: glyphs.GlyphProfile = {
                 "pixel_size": pixel_size,
                 "anchors": anchors,
                 "verbose": v,
@@ -140,49 +135,48 @@ def export(export_fn: Callable[[str], Path],
                 "accent": profile["accent"]
             }
 
-            for pbm in sorted(glyph_dir.glob("glyph_*.pbm")):
-                index = int(pbm.stem.split("_")[1])
-                codepoint: int = int(blocks[block_name]["start"]) + (index - 1)
-                log(v, f"Building Glyph index: {index} (U+{codepoint:04X})")
+            start: int = blocks[block_name]["start"]
+            for index in range(blocks[block_name]["end"] - start + 1):
+                codepoint: int = start + index
+                pbm = glyph_dir / f"{glyphs.get_glyph_label(codepoint)}.pbm"
+                if not pbm.is_file():
+                    log(v, f"Skipping Glyph: U+{codepoint:04X} (No PBM file)")
+                    continue
+                log(v, f"Building Glyph: U+{codepoint:04X}")
                 built += build_glyph(pbm, glyph, glyph_profile, cmap=codepoint)
 
             # Check if extra features exist as glyphs config
-            feat_glyphs = font.ext_glyphs_yml(block_name)
+            ext_glyphs_yml = font.ext_glyphs_yml(block_name)
 
-            if feat_glyphs.is_file():
-                with as_file(font.project_glyphs(block_name, family_name, f"{EXT_PREFIX}{face}")) as ext_glyph_dir:
-                    if not ext_glyph_dir.exists():
-                        glyph_error = (
-                            f"Extra glyphs for '{block_name}' required in profile/{EXT_PREFIX}glyphs.yml "
-                            f"does not exist for exporting at: \n'{ext_glyph_dir.name}'"
-                        )
-                        print(f"{'\033[93m'}{glyph_error}{'\033[0m'}", file=stderr)
-                        continue
+            if not ext_glyphs_yml.is_file():
+                continue
 
-                ext_glyph_yaml = load_yaml(feat_glyphs)
-                ext_glyph_list: ExtraGlyphsList = parse_extra_glyphs(ext_glyph_yaml)
+            ext_glyph_dir = font.project_glyphs(block_name, family_name, f"{glyphs.EXT_PREFIX}{face}")
+            if not ext_glyph_dir.is_dir():
+                glyph_error = (
+                    f"Extra glyphs for '{block_name}' required in profile/{glyphs.EXT_PREFIX}glyphs.yml "
+                    f"does not exist for exporting at: \n'{ext_glyph_dir.name}'"
+                )
+                print(f"{'\033[93m'}{glyph_error}{'\033[0m'}", file=stderr)
+                continue
 
-                # Add all Extra glyphs
-                for pbm in sorted(ext_glyph_dir.glob("glyph_*.pbm")):
-                    index = int(pbm.stem.split("_")[1]) - 1
-                    if index > len(ext_glyph_list["glyphs"]) - 1:
-                        glyph_error = (
-                            f"No definition found for Extra glyph at:\n{pbm}\n"
-                            f"Expected key required in {EXT_PREFIX}glyph.yml: 'ext-{index:02X}': "
-                        )
-                        print(f"{'\033[93m'}{glyph_error}{'\033[0m'}", file=stderr)
-                        continue
+            # Add all Extra glyphs
+            ext_glyph_list = glyphs.parse_extra_glyphs(load_yaml(ext_glyphs_yml))
+            for index, ext_glyph in enumerate(ext_glyph_list["glyphs"]):
+                if (filename := ext_glyph.get_glyph_name()) is None:
+                    filename = glyphs.get_extra_glyph_label(index)
 
-                    ext_glyph: ExtraGlyph = ext_glyph_list["glyphs"][index]
-                    if not ext_glyph:
-                        glyph_error = (
-                            f"No definition found for Extra glyph at:\n{pbm}\n"
-                            f"Expected key required in ext-glyph.yml: 'ext-{index:02X}': "
-                        )
-                        print(f"{'\033[93m'}{glyph_error}{'\033[0m'}", file=stderr)
-                        continue
-                    log(v, f"Building Extra Glyph: {index} (EXT-{index:02X})")
-                    built += build_glyph(pbm, glyph, glyph_profile, name=ext_glyph.name, cmap=ext_glyph.cmap)
+                pbm = ext_glyph_dir / f"{filename}.pbm"
+                if not pbm.is_file():
+                    glyph_error = (
+                        f"Extra glyph PBM file '{pbm.name}' not found!\n"
+                        f"Required in ext-glyph.yml: '{glyphs.get_extra_glyph_label(index)}'"
+                    )
+                    print(f"\033[93m{glyph_error}\033[0m", file=stderr)
+                    continue
+
+                log(v, f"Building Extra Glyph: {index} (EXT-{index:02X})")
+                built += build_glyph(pbm, glyph, glyph_profile, name=ext_glyph.name, cmap=ext_glyph.cmap)
     except Exception as e:
         print(f"{'\033[93m'}Exception when collecting glyphs:\n{e}{'\033[0m'}", file=stderr)
     if unicode_missing is not None:

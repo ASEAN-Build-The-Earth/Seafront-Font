@@ -51,6 +51,14 @@ def project_ext_font_table(block_name: str) -> Traversable:
     return PROJECT_DIR / block_name / "ext-font-table.png"
 
 
+def project_aseprite(block_name: str) -> Traversable:
+    return PROJECT_DIR / block_name / "design.aseprite"
+
+
+def project_ext_aseprite(block_name: str) -> Traversable:
+    return PROJECT_DIR / block_name / "ext-design.aseprite"
+
+
 def project_glyphs(block_name: str, family: str, style: str) -> Traversable:
     return PROJECT_DIR / block_name / "glyphs" / family / style
 
