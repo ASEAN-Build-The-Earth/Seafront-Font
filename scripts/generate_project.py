@@ -24,27 +24,24 @@ from importlib.resources import as_file
 from importlib.resources.abc import Traversable
 from pathlib import Path
 from unicodedata import category
-from typing import cast, TypedDict, BinaryIO, TextIO, Any
+from typing import TypedDict, Any
 
-from PIL import Image
-from PIL import ImageFont
+from sys import stderr
 from PIL.Image import Image as Sheet
-from PIL.ImageFont import BaseImageFont
+from PIL.ImageFont import ImageFont
 
 from seafront.core.design.project import check_extra_glyphs
-from seafront.generate import generate_font_table, load_unifont_hex, generate_empty_graphics
 from seafront.core.design.aseprite_scripts import create_project
+from seafront.generate import generate_font_table, generate_empty_graphics, make_null_cell, make_font_cell
 from seafront.model.font import FontYML
 from seafront.model.glyphs import parse_extra_glyphs, get_extra_glyph_label, ExtraGlyphsList, EXT_PREFIX
+from seafront.model.pilfont import Seafront16pxUI
+from seafront.model.unifont import load_unifont_hex
 from seafront.unicode import load_unicode_blocks, UnicodeBlock, is_non_printable
 import seafront.font as font
 import yaml
 import argparse
 
-FONT16_REGULAR: str = "BTE-Seafront-Square-Regular.ttf"
-FONT_CONDENSED: str = "BTE-Seafront-Square-Condensed.ttf"
-CELL_64: str = "font-cell-64px.png"
-NULL_64: str = "null-cell-64px.png"
 UNIFONT: str = "unifont_sample-18.0.01.hex"
 
 
@@ -88,8 +85,7 @@ def generate(block: UnicodeBlock,
     font_cell: Sheet = assets["font_cell"]
     null_cell: Sheet = assets["null_cell"]
     unifont_hex: dict[int, bytes] = assets["unifont_hex"]
-    label_font: tuple[BaseImageFont, BaseImageFont] = (assets["font16_regular"],
-                                                       assets["font_condensed"])
+    seafront_ui: Seafront16pxUI[ImageFont] = assets["seafront_ui"]
 
     project = font.project_root(block["name"])
     with as_file(project) as project_dir:
@@ -105,7 +101,7 @@ def generate(block: UnicodeBlock,
         cell = font_cell if has_graphic(code) else null_cell
         return name, cell, code
 
-    sheet = generate_font_table(fn, label_font, count, unifont_hex)
+    sheet = generate_font_table(fn, seafront_ui, count, unifont_hex)
 
     ext_glyphs: ExtraGlyphsList | None = check_extra_glyphs(block["name"])
     for family in families:
@@ -132,13 +128,13 @@ def generate(block: UnicodeBlock,
 
         def fn(i: int) -> tuple[str, Sheet, int | None]:
             cell = null_cell if glyphs[i].is_undefined() else font_cell
-            return get_extra_glyph_label(i), cell, glyphs[i].cmap
+            return get_extra_glyph_label(i).upper(), cell, glyphs[i].cmap
 
         if verbose:
             print(f"{len(glyphs)} glyphs Extension feature found "
                   f"for '{block["name"]}' unicode range")
 
-        sheet = generate_font_table(fn, label_font, len(glyphs), unifont_hex, columns)
+        sheet = generate_font_table(fn, seafront_ui, len(glyphs), unifont_hex, columns)
         table = font.project_ext_font_table(block["name"])
         exist = "Overwritten" if table.is_file() else "Generated"
         with as_file(table) as image_file:
@@ -154,15 +150,13 @@ class ImageAssets(TypedDict):
 
     :ivar font_cell: Font cell image for design graphics
     :ivar null_cell: Font cell image for non-design graphics
-    :ivar font16_regular: label font for Regular style
-    :ivar font_condensed: label font for Condensed style
     :ivar unifont_hex: Unifont Unicode table for character reference
+    :ivar seafront_ui: Seafront labeling UI font
     """
     font_cell: Sheet
     null_cell: Sheet
-    font16_regular: BaseImageFont
-    font_condensed: BaseImageFont
     unifont_hex: dict[int, bytes]
+    seafront_ui: Seafront16pxUI[ImageFont]
 
 
 def main():
@@ -181,6 +175,13 @@ def main():
         help="log verbose outputs"
     )
 
+    parser.add_argument('-u', "--unifont",
+        nargs="+",
+        default=[UNIFONT],
+        help=f"GNU Unifont .hex sample file, must be placed "
+             f"under /assets directory. (Default to '{UNIFONT}')"
+    )
+
     family_options: list[str] = config["typeface"]["family"]
     parser.add_argument(
         "-f", "--family",
@@ -190,21 +191,31 @@ def main():
         help="Family name to generate (default: Only generate 'Seafront' Family)"
     )
 
-    # Load all assets we will need for font table generation
-    with ((font.ASSETS_DIR / CELL_64).open("rb") as cell_64,
-        (font.ASSETS_DIR / NULL_64).open("rb") as null_64,
-        (font.ASSETS_DIR / FONT16_REGULAR).open("rb") as font_16px,
-        (font.ASSETS_DIR / FONT_CONDENSED).open("rb") as font_16cd,
-        (font.ASSETS_DIR / UNIFONT).open("r") as unifont):
-        image_assets: ImageAssets = {
-            "font_cell": Image.open(cell_64).convert("RGBA"),
-            "null_cell": Image.open(null_64).convert("RGBA"),
-            "font16_regular": ImageFont.truetype(cast(BinaryIO, font_16px), 16),
-            "font_condensed": ImageFont.truetype(cast(BinaryIO, font_16cd), 16),
-            "unifont_hex": load_unifont_hex(cast(TextIO, unifont))
-        }
-
     args = parser.parse_args()
+
+    unifont: dict[int, bytes] = {}
+    if isinstance(args.unifont, list) and len(args.unifont) > 0:
+        for file in args.unifont:
+            try: # Safely find unifont.hex file and load it
+                with (font.ASSETS_DIR / file).open("r") as io:
+                    load_unifont_hex(io, unifont)
+                    break
+            except FileNotFoundError, IsADirectoryError:
+                print(f"\033[93mWARNING: '{file}' Unifont sample file not found!\n"
+                      f"WARNING: Make sure the file is placed inside 'assets' directory.\033[0m", file=stderr)
+    elif len(unifont) <= 0:
+        print(f"\033[93mWARNING: '{UNIFONT}' Unifont sample file not found!\n"
+              f"WARNING: if the file name has changed, "
+              f"please provide them with --unifont argument.\033[0m", file=stderr)
+
+    # Load all assets we will need for font table generation
+    image_assets: ImageAssets = {
+        "font_cell": make_font_cell(),
+        "null_cell": make_null_cell(),
+        "unifont_hex": unifont,
+        "seafront_ui": Seafront16pxUI.load_image_font(),
+    }
+
     if isinstance(args.block, list) and len(args.block) > 0:
         for i, block_name in enumerate(args.block):
             if block_name not in unicode_blocks:

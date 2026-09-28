@@ -27,6 +27,10 @@ SEAFRONT_DIR: Traversable = files("seafront")
 """seafront src root"""
 
 
+def font_data() -> Traversable:
+    return ASSETS_DIR / "fontdata"
+
+
 def font_yml() -> Traversable:
     return FONT_DIR / "font.yml"
 
