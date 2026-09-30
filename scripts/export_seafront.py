@@ -148,7 +148,7 @@ def main():
         font_info["family"] = args.family
 
     if args.identifier:
-        font_info["version"] = f"Version {args.identifier:.3f}"
+        font_info["version"] = args.identifier
 
     font: FontExport = {
         "style": config["typeface"]["style"][face],

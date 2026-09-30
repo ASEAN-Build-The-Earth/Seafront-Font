@@ -251,11 +251,18 @@ def export(export_fn: Callable[[str], Path],
     post_script: str = packed_name.replace(' ', '-')
 
     # BTE Seafront <name> Regular Version 1.000
-    identifier: str | None = font_export["info"].get("version")
-    if identifier is not None and isinstance(identifier, str):
-        font_version = identifier
-    else:
-        font_version = font_data["design-version"]
+    design_version: str = font_data.get("design-version", "1.000")
+    export_version: str = font_export["info"].get("version", design_version)
+    try:
+        # Float identifier can be set as font revision number
+        identifier: float | int = float(export_version)
+        font_version: str = f"Version {identifier:.3f}"
+        fb.updateHead(fontRevision=identifier)
+    except ValueError:
+        print(f"\033[93mWARNING: Exporting font version is not float! "
+              f"Cannot set font revision number.\033[0m", file=stderr)
+        font_version: str = export_version
+
     font_naming.append(font_version)
     unique_name: str = ' '.join(font_naming)
 

@@ -4,7 +4,7 @@
 font:
   # BTE Seafront
   seafront:
-    design-version: "Version 1.000"
+    design-version: 1.000
     font-desc-name: ~
     font-desc-info: "The standard Seafront font"
     design-credits: > 
@@ -24,7 +24,7 @@ font:
       ! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ ` { | } ~
   # BTE Seafront Thai
   seafront-thai:
-    design-version: "Version 1.000"
+    design-version: 1.000
     font-desc-name: "Thai"
     font-desc-info: "The Thai-script support of Seafront"
     design-credits: > 
