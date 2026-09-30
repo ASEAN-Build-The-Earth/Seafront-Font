@@ -40,8 +40,12 @@ class SeafrontPilFont(FontFile):
 
     94 Printable Characters (U+0021-U+007E) + 1 Space Character (U+0020)
 
-    :return: Pillow :class:`FontFile` implementations,
-             use :code:`to_imagefont()` to load as :class:`ImageFont`.
+    :ivar name: Name of the font
+    :ivar bitmap: f/ :class:`FontFile` compiled bitmap image file
+    :ivar metrics: f/ :class:`FontFile` defines each glyphs' boundary metrics
+    :ivar ysize: f/ :class:`FontFile` defines the final compiled bitmap's y-size
+    :ivar glyph: f/ :class:`FontFile` defines all available glyphs
+    :ivar info: f/ :class:`FontFile` defines additional font info (unused)
     :cvar DESCENDER: 4px descender height
     :cvar ASCENDER: 4px font ascender height
     :cvar X_HEIGHT: 8px font x-height typography
@@ -63,7 +67,10 @@ class SeafrontPilFont(FontFile):
         self.bitmap = Image.open(BytesIO(b64decode(data["image_bytes"])))
         self.metrics = [None] * 256
         self.name = name
-        self.ysize = self.X_HEIGHT + self.ASCENDER
+
+        # Baseline are constant because our bitmap image only have 1 row
+        y_baseline: int = self.X_HEIGHT + self.ASCENDER
+        self.ysize = y_baseline + self.DESCENDER
 
         def get_advance(unicode: int) -> int:
             """Get the advance width of this Unicode glyph"""
@@ -72,19 +79,24 @@ class SeafrontPilFont(FontFile):
                     return advance
             return data["default_adv"]
 
-        upm: int = self.ysize + self.DESCENDER
         lsb: int = 0
         for codepoint in range(0x20, 0x7F):
             adv = get_advance(codepoint)
             self.glyph[codepoint] = (
                 (adv, 0),
-                (-self.SPACING, -self.ysize, adv - self.SPACING, self.DESCENDER),
-                (lsb, 0, lsb + adv, upm),
+                (-self.SPACING, -y_baseline, adv - self.SPACING, self.DESCENDER),
+                (lsb, 0, lsb + adv, self.ysize),
                 cast(Sheet, cast(object, None)),
             )
             lsb += adv
 
     def compile(self) -> None:
+        """
+        Overrides :class:`FontFile`.compile()
+        which load :attr:`~.glyph` directly to :attr:`~.metrics` [i]
+
+        :return: None, compiled to :attr:`~.metrics`
+        """
         if (self.bitmap is None) or (self.glyph is None):
             raise ValueError("Bitmap and Glyphs must be initialized before compiling")
 
@@ -132,7 +144,8 @@ def seafront_16px_squared() -> SeafrontPilFont:
     """
     Display font of 16px upm, 8px*8px 'squared' typography
 
-    :return: Pillow font file :class:`SeafrontPilFont`
+    :return: Pillow :class:`FontFile` implementations,
+             use :code:`to_imagefont()` to load as :class:`ImageFont`.
     """
     return SeafrontPilFont("Seafront UI Squared", {
         "default_adv": 9,
@@ -168,7 +181,8 @@ def seafront_16px_compact() -> SeafrontPilFont:
     """
     Compact display font of 16px upm, 6px*8px typography
 
-    :return: Pillow font file :class:`SeafrontPilFont`
+    :return: Pillow :class:`FontFile` implementations,
+             use :code:`to_imagefont()` to load as :class:`ImageFont`.
     """
     return SeafrontPilFont("Seafront UI Compact", {
         "default_adv": 7,
