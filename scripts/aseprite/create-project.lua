@@ -101,7 +101,7 @@ function loadDesign(folder)
                         or filename:match("ext%-(.+)%.png$")
                     local checked = is_extension and true or not style:match("^ext%-")
 
-                    if style and checked then
+                    if style and checked and font.style[style] ~= nil then
                         if verbose then
                             print("Found: '"  .. filename ..
                                 "' for " .. familyName .. " ".. font.style[style])
