@@ -12,8 +12,8 @@ from importlib.resources import as_file
 
 import yaml
 import seafront.font as font
-from seafront.core.design.aseprite_scripts import save_graphics, export_graphics
-from seafront.core.design.project import find_design_layers, save_glyphs, UnicodeProject
+from seafront.core.design.aseprite_scripts import save_graphics, export_graphics, create_project
+from seafront.core.design.project import find_design_layers, save_glyphs, UnicodeProject, check_extra_glyphs
 
 from seafront.model.font import FontYML
 from seafront.unicode import UnicodeBlock
@@ -56,6 +56,7 @@ def aseprite(projects: list[UnicodeBlock],
 
 def png_image(projects: list[UnicodeBlock],
               family_name: set[str],
+              sync_aseprite: bool,
               verbose: bool) -> None:
     with font.font_yml().open(encoding="utf-8") as io:
         config: FontYML = yaml.safe_load(io)
@@ -81,3 +82,18 @@ def png_image(projects: list[UnicodeBlock],
                 print(f"\033[36mExtra glyphs\033[0m: Wrote {ext} files "
                       f"for {design_layer["family_name"]} "
                       f"{config["typeface"]["style"][style]}")
+
+    if not sync_aseprite:
+        return
+
+    for i, unicode_project in enumerate(projects):
+        block: str = unicode_project["name"]
+        extra: bool = check_extra_glyphs(block) is not None
+
+        print(f"\033[94m================= \033[1m"
+              f"({i + 1}/{len(projects)}) Syncing '{block}' \033[0m "
+              f"\033[94m=================\033[0m")
+        create_project(font.project_root(block), False, verbose)
+
+        if extra:
+            create_project(font.project_root(block), True, verbose)
