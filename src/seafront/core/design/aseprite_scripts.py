@@ -88,7 +88,6 @@ def export_graphics(aseprite_file: Traversable,
                    "--script-param", f"codepoint={start_codepoint:04X}"]
 
             if verbose:
-                print("Exporting verbose")
                 cli.append("--script-param")
                 cli.append(f"verbose=true")
 
@@ -128,10 +127,11 @@ def create_project(project_dir: Traversable,
                 "--batch",
                 "--script-param", f"dir={project}",
                 "--script-param", f"config={config}",
-                "--script-param", f"ext={is_extension}"
             ]
+            if is_extension:
+                cli.append("--script-param")
+                cli.append(f"ext=true")
             if verbose:
-                print("Exporting verbose")
                 cli.append("--script-param")
                 cli.append(f"verbose=true")
 

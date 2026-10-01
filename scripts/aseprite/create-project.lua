@@ -40,7 +40,7 @@ if not config then
     error("Missing script parameter: config")
 end
 
-local is_extension = ext and (ext == "True" and true or false) or false
+local is_extension = ext and (ext:lower() == "true" and true or false) or false
 local projectsPath = "projects"
 local extParentPath = is_extension and "ext-" or ""
 local fontTablePath = app.fs.joinPath(dir, extParentPath .. "font-table.png")
