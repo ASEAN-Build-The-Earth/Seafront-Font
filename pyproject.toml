@@ -36,6 +36,7 @@ plotting = [
     "cycler==0.12.1",
     "matplotlib==3.11.1",
 ]
+ci = ["gitpython==3.2.0"]
 
 [project.urls]
 Homepage = "https://asean.buildtheearth.asia/"
@@ -55,6 +56,13 @@ addopts = ["-v", "--doctest-modules", "src/seafront/unicode.py"] # rn only unico
 save-project-with = "scripts.save_project_with:main"
 generate-project = "scripts.generate_project:main"
 export-seafront = "scripts.export_seafront:main"
+verify-project = "scripts.ci.verify_project:main"
+
+[tool.hatch.envs.verify]
+dependencies = ["gitpython"]
+
+[tool.hatch.envs.verify.scripts]
+project = "verify-project {args}"
 
 [tool.hatch.build.targets.sdist]
 include = ["/seafront", "/src", "/script", "/font", "/assets"]
