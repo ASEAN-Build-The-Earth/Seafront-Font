@@ -327,8 +327,7 @@ def main() -> int:
     for i, block_name in enumerate(sorted(changed_blocks)):
 
         print(f"\33[33m================= \033[1m"
-              f"({i + 1}/{len(changed_blocks)}) Verifying '{block_name}'\033[0m "
-              f"\33[33m=================\033[0m")
+              f"({i + 1}/{len(changed_blocks)}) Verifying '{block_name}'\033[0m")
 
         block: UnicodeBlock = unicode_blocks[block_name]
         source: Source | None = determine_source(block_name, changed_files)
@@ -343,8 +342,7 @@ def main() -> int:
             )
 
             print(f"\33[33m================= \033[1m"
-                  f"WARNING: '{block_name}'\033[0m "
-                  f"\33[33m=================\033[0m")
+                  f"WARNING: '{block_name}'\033[0m")
             print("Source: UNKNOWN")
             print("PBM files were changed without any PNG or Aseprite source.")
             print(
@@ -365,8 +363,7 @@ def main() -> int:
         )
 
         print(f"\33[33m================= \033[1m"
-              f"Generated '{block_name}'\033[0m "
-              f"\33[33m=================\033[0m")
+              f"Generated '{block_name}'\033[0m")
 
         log_changes(source, changes, verbose=args.verbose)
 

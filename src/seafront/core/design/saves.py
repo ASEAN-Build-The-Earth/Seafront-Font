@@ -32,25 +32,21 @@ def aseprite(projects: list[UnicodeBlock],
         design_aseprite = font.project_aseprite(block)
         if design_aseprite.is_file():
             print(f"\033[32m================= \033[1m"
-                  f"(1/2) Saving '{block}' ({design_aseprite.name})\033[0m "
-                  f"\033[32m=================\033[0m")
+                  f"(1/2) Saving '{block}' ({design_aseprite.name})\033[0m")
             save_graphics(design_aseprite, verbose)
 
             print(f"\033[32m================= \033[1m"
-                  f"(2/2) Exporting '{block}' ({design_aseprite.name})\033[0m "
-                  f"\033[32m=================\033[0m")
+                  f"(2/2) Exporting '{block}' ({design_aseprite.name})\033[0m")
             export_graphics(design_aseprite, start, verbose)
 
         ext_design_aseprite = font.project_ext_aseprite(block)
         if ext_design_aseprite.is_file():
             print(f"\033[32m================= \033[1m"
-                  f"(1/2) Saving '{block}' ({ext_design_aseprite.name})\033[0m "
-                  f"\033[32m=================\033[0m")
+                  f"(1/2) Saving '{block}' ({ext_design_aseprite.name})\033[0m")
             save_graphics(ext_design_aseprite, verbose)
 
             print(f"\033[32m================= \033[1m"
-                  f"(2/2) Exporting '{block}' ({ext_design_aseprite.name})\033[0m "
-                  f"\033[32m=================\033[0m")
+                  f"(2/2) Exporting '{block}' ({ext_design_aseprite.name})\033[0m")
             export_graphics(ext_design_aseprite, start, verbose)
 
 
@@ -66,8 +62,8 @@ def png_image(projects: list[UnicodeBlock],
     # For all Unicode project we want to save
     for i, design_layer in enumerate(layers):
         print(f"\033[32m================= \033[1m"
-              f"({i + 1}/{len(layers)}) Saving '{design_layer["block_name"]}'\033[0m "
-              f"\033[32m=================\033[0m")
+              f"({i + 1}/{len(layers)}) Saving {design_layer["family_name"]} "
+              f"'{design_layer["block_name"]}'\033[0m")
         result = save_glyphs(design_layer,
                              config["typeface"]["style"],
                              config["profile"],
@@ -91,8 +87,7 @@ def png_image(projects: list[UnicodeBlock],
         extra: bool = check_extra_glyphs(block) is not None
 
         print(f"\033[94m================= \033[1m"
-              f"({i + 1}/{len(projects)}) Syncing '{block}' \033[0m "
-              f"\033[94m=================\033[0m")
+              f"({i + 1}/{len(projects)}) Syncing '{block}' \033[0m")
         create_project(font.project_root(block), False, verbose)
 
         if extra:
