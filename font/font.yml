@@ -12,6 +12,7 @@ font:
       With contributions from the BuildTheEarth Community
     unicode-blocks:
       - "Basic Latin"
+      - "Latin-1 Supplement"
     features-afdko:
       parent-afdko: "features/seafront.fea"
       includes-fea:
