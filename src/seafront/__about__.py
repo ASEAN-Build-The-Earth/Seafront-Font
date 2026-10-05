@@ -1,4 +1,4 @@
-__version__ = "1.0.0.dev2"
+__version__ = "1.0.0.dev3"
 __author__ = "Tin"
 __email__ = "tintinkung.lemonade@gmail.com"
 __license__ = """\
