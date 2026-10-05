@@ -1,0 +1,33 @@
+name: Release font export artifacts
+on:
+  release:
+    types: [created]
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      # This batch export all configured fonts
+      - name: Export OpenType Fonts
+        run: hatch run export-seafront --batch
+      # This build source distribution and wheel
+      - name: Build Python package
+        run: hatch build
+      # Attach build outputs to the GitHub Release
+      - name: Upload release artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            font/export/*.ttf \
+            dist/*.whl \
+            dist/*.tar.gz

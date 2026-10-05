@@ -221,8 +221,7 @@ def main():
             if block_name not in unicode_blocks:
                 raise ValueError(f"Unknown Unicode block '{block_name}'")
             print(f"\033[32m================= \033[1m"
-                  f"Generating {i + 1}/{len(args.block)} '{block_name}'\033[0m "
-                  f"\033[32m=================\033[0m")
+                  f"Generating {i + 1}/{len(args.block)} '{block_name}'\033[0m")
             generate(unicode_blocks[block_name],
                      image_assets,
                      families=set(args.family),
@@ -236,8 +235,7 @@ def main():
                 f"'{block_name}' referenced in project.yml "
                 f"but not found in unicode-blocks.json")
         print(f"\033[32m================= \033[1m"
-              f"Generating {i + 1}/{len(project["blocks"])} '{block_name}'\033[0m "
-              f"\033[32m=================\033[0m")
+              f"Generating {i + 1}/{len(project["blocks"])} '{block_name}'\033[0m")
         generate(unicode_blocks[block_name],
                  image_assets,
                  families=set(args.family),

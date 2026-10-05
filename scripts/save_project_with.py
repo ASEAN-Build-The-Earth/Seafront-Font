@@ -51,8 +51,12 @@ class SaveOption(NamedTuple):
 
 
 class NamedSaveOption(SaveOption):
-    """:ivar name: Family name to export this save."""
+    """
+    :ivar name: Family name to export this save.
+    :ivar sync_aseprite: Whether to sync aseprite design files too.
+    """
     name: list[str]
+    sync_aseprite: bool
 
 
 def with_aseprite(args: SaveOption):
@@ -66,7 +70,7 @@ def with_png_image(args: NamedSaveOption):
     if ((project := args.font) is not None or
        (project := args.project) is not None or
        (project := args.unicode) is not None):
-        png_image(project, set(args.name), args.verbose)
+        png_image(project, set(args.name), args.sync_aseprite, args.verbose)
 
 
 PNG_ADVANCED_OPTIONS = """
@@ -153,6 +157,11 @@ def main():
         default=[family_options[0]],
         choices=family_options,
         help=argparse.SUPPRESS,
+    )
+    parser_png_image.add_argument(
+        "-s", "--sync-aseprite",
+        action="store_true",
+        help="Sync design.aseprite file(s) (Required Aseprite app)"
     )
 
     args = parser.parse_args()

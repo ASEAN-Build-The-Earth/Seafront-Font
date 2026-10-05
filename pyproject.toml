@@ -25,7 +25,7 @@ classifiers = [
   "License :: OSI Approved :: SIL Open Font License 1.1 (OFL-1.1)"
 ]
 dependencies = [
-    "fonttools==4.65.0",
+    "fonttools==4.66.1",
     "pillow==12.3.0",
     "pyyaml==6.0.3",
     "pytest==9.1.1"
@@ -34,8 +34,9 @@ dependencies = [
 [project.optional-dependencies]
 plotting = [
     "cycler==0.12.1",
-    "matplotlib==3.11.1",
+    "matplotlib==3.11.2",
 ]
+ci = ["gitpython==3.2.0"]
 
 [project.urls]
 Homepage = "https://asean.buildtheearth.asia/"
@@ -48,16 +49,23 @@ Changelog = "https://github.com/ASEAN-Build-The-Earth/Seafront-Font/releases"
 path = "src/seafront/__about__.py"
 
 [tool.pytest.ini_options]
-testpaths = ["tests/*"]
-addopts = ["-v", "--doctest-modules", "src/seafront/unicode.py"] # rn only unicode.py have doctest
+testpaths = ["tests/*", "src/seafront/unicode.py"]
+addopts = ["-v", "--doctest-modules"] # rn only unicode.py have doctest
 
 [project.scripts]
 save-project-with = "scripts.save_project_with:main"
 generate-project = "scripts.generate_project:main"
 export-seafront = "scripts.export_seafront:main"
+verify-project = "scripts.ci.verify_project:main"
+
+[tool.hatch.envs.verify]
+dependencies = ["gitpython"]
+
+[tool.hatch.envs.verify.scripts]
+project = "verify-project {args}"
 
 [tool.hatch.build.targets.sdist]
-include = ["/seafront", "/src", "/script", "/font", "/assets"]
+include = ["/src", "/projects", "/scripts", "/font", "/tests", "/assets"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/seafront", "scripts"]

@@ -148,7 +148,7 @@ def main():
         font_info["family"] = args.family
 
     if args.identifier:
-        font_info["version"] = f"Version {args.identifier:.3f}"
+        font_info["version"] = args.identifier
 
     font: FontExport = {
         "style": config["typeface"]["style"][face],
@@ -182,8 +182,7 @@ def main():
         for i, font_name in enumerate(fonts):
             data: FontData = config["font"][font_name]
             print(f"\33[33m================= \033[1m"
-                  f"Exporting {i + 1}/{len(fonts)} '{font_name}'\033[0m "
-                  f"\33[33m=================\033[0m")
+                  f"Exporting {i + 1}/{len(fonts)} '{font_name}'\033[0m")
             export(export_fn, font, data, profile)
 
     if args.batch:
