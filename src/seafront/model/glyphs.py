@@ -29,7 +29,7 @@ class ExtraGlyph(NamedTuple):
     cmap: int | None
 
     @classmethod
-    def undefined(cls) -> ExtraGlyph:
+    def undefined(cls) -> "ExtraGlyph":
         return cls(name=None, cmap=None)
 
     def is_undefined(self):
@@ -64,7 +64,7 @@ class GlyphMetric(NamedTuple):
     lsb: int
 
     @classmethod
-    def as_marks(cls, *, adv: int, lsb: int) -> GlyphMetric:
+    def as_marks(cls, *, adv: int, lsb: int) -> "GlyphMetric":
         """
         Create the metric as Mark class.
 

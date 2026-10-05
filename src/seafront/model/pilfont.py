@@ -120,7 +120,7 @@ class Seafront16pxUI[T](NamedTuple):
     compact: T
 
     @classmethod
-    def load_font_data(cls) -> Seafront16pxUI[SeafrontPilFont]:
+    def load_font_data(cls) -> "Seafront16pxUI[SeafrontPilFont]":
         """
         Load as :class:`FontFile`
         """
@@ -130,7 +130,7 @@ class Seafront16pxUI[T](NamedTuple):
         )
 
     @classmethod
-    def load_image_font(cls) -> Seafront16pxUI[ImageFont]:
+    def load_image_font(cls) -> "Seafront16pxUI[ImageFont]":
         """
         Load as :class:`ImageFont`
         """
