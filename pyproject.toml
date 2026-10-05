@@ -49,8 +49,8 @@ Changelog = "https://github.com/ASEAN-Build-The-Earth/Seafront-Font/releases"
 path = "src/seafront/__about__.py"
 
 [tool.pytest.ini_options]
-testpaths = ["tests/*"]
-addopts = ["-v", "--doctest-modules", "src/seafront/unicode.py"] # rn only unicode.py have doctest
+testpaths = ["tests/*", "src/seafront/unicode.py"]
+addopts = ["-v", "--doctest-modules"] # rn only unicode.py have doctest
 
 [project.scripts]
 save-project-with = "scripts.save_project_with:main"
