@@ -13,6 +13,7 @@ import json
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal, TypedDict, Iterable, overload
+from .file_changes import filter_changes, is_synced, FileChanges, ChangeTypes
 
 REPORT_DIR = Path("font/cover")
 
@@ -29,23 +30,6 @@ class Source(StrEnum):
     ASE = "aseprite"
     PNG = "png"
     PBM = "pbm"
-
-
-class FileChanges[T](TypedDict):
-    """
-    Record files that is changed after the verified (from determined source) saves.
-
-    :ivar added: File exists in canonical state but not PR HEAD
-    :ivar unsync: File exists in PR HEAD but not canonical state
-    :ivar modified: File exists in both, but contents differ
-    """
-    added: list[T] | set[T]
-    unsync: list[T] | set[T]
-    modified: list[T] | set[T]
-
-
-ChangeTypes = Literal["modified", "unsync", "added"]
-"""Dict keys literal of :class:`FileChanges`"""
 
 
 SaveStatus = Literal["synced", "updated"]
@@ -73,17 +57,6 @@ class SavesReport(TypedDict):
     head: str
     status: SaveStatus
     projects: dict[str, ProjectReport]
-
-
-def as_dict[T](changes: FileChanges[T]) -> FileChanges[list[T]]:
-    return {
-        "added": sorted(changes["added"]),
-        "unsync": sorted(changes["unsync"]),
-        "modified": sorted(changes["modified"]),
-    }
-
-def is_synced[T](changes: FileChanges[T]) -> bool:
-    return not (changes["added"] or changes["unsync"] or changes["modified"])
 
 
 class VerificationReport:
@@ -130,7 +103,7 @@ class VerificationReport:
             project: ProjectReport = {
                 "status": "synced" if is_synced(changes) else "updated",
                 "source": source,
-                "update": as_dict(changes)
+                "update": changes
             }
 
         self.data["projects"][block_name] = project
