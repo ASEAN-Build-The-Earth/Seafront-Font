@@ -7,19 +7,16 @@ inputs:
 outputs:
   aseprite-sha:
     description: Unchanged input commit SHA for chaining
-    value: ${{ steps.cache.outputs.aseprite_sha }}
+    value: ${{ steps.post.outputs.aseprite_sha }}
 runs:
   using: composite
   steps:
     - name: Restore Aseprite cache
       id: cache
       uses: actions/cache/restore@v6
-      run: echo "aseprite_sha=$ASEPRITE_COMMIT_SHA" >> "$GITHUB_OUTPUT"
       with:
         path: ${{ runner.temp }}/setup-aseprite/clone/submodules/aseprite/aseprite/build/bin
-        key: aseprite-${{ runner.os }}-${{ env.ASEPRITE_COMMIT_SHA }}
-      env:
-        ASEPRITE_COMMIT_SHA: ${{ inputs.aseprite-sha }}
+        key: Aseprite-${{ runner.os }}-${{ inputs.aseprite-sha }}
 
     - name: Prepare Aseprite source
       shell: bash
@@ -46,6 +43,11 @@ runs:
       working-directory: ${{ runner.temp }}/setup-aseprite
       run: |
         set -euo pipefail
+        
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt-get update
+          sudo apt-get install --yes libxcb1-dev libxcursor-dev libxi-dev libxrandr-dev libglx-dev libgl-dev libfontconfig-dev
+        fi
 
         cd clone
         git checkout temp
@@ -58,10 +60,19 @@ runs:
         bash ./build.sh --auto --norun
       env:
         ASEPRITE_COMMIT_SHA: ${{ inputs.aseprite-sha }}
+        RUNNER_OS: ${{ runner.os }}
 
     - name: Save Aseprite as cache
       if: steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v6
       with:
         path: ${{ runner.temp }}/setup-aseprite/clone/submodules/aseprite/aseprite/build/bin
-        key: aseprite-${{ runner.os }}-${{ inputs.aseprite-sha }}
+        key: Aseprite-${{ runner.os }}-${{ inputs.aseprite-sha }}
+
+    - name: Post Action Output
+      id: post
+      shell: bash
+      run: |
+        echo "aseprite_sha=$ASEPRITE_COMMIT_SHA" >> "$GITHUB_OUTPUT"
+      env:
+        ASEPRITE_COMMIT_SHA: ${{ inputs.aseprite-sha }}

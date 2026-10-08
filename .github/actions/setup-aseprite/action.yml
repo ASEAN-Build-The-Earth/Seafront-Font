@@ -13,7 +13,7 @@ runs:
       uses: actions/cache/restore@v6
       with:
         path: ${{ runner.temp }}/setup-aseprite/clone/submodules/aseprite/aseprite/build/bin
-        key: aseprite-${{ runner.os }}-${{ inputs.aseprite-sha }}
+        key: Aseprite-${{ runner.os }}-${{ inputs.aseprite-sha }}
 
     - name: Add Aseprite to PATH
       shell: bash
@@ -25,5 +25,3 @@ runs:
     - name: Fallback Setup Aseprite
       if: steps.cache.outputs.cache-hit != 'true'
       uses: neomura/setup-aseprite-cli-action@v1.0.6
-      run: |
-        echo "::warning::Cache not hit, fallback build will not follow the input commit"

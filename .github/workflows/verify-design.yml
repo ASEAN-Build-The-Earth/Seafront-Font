@@ -17,8 +17,9 @@ jobs:
     outputs:
       aseprite_sha: ${{ steps.cache.outputs.aseprite-sha }}
     steps:
+      - uses: actions/checkout@v7
       - with:
-          aseprite-sha: 0123456789abcdef0123456789abcdef01234567'
+          aseprite-sha: 331e898ef405d919539c03fd1675691cfa16c3a3
         id: cache
         uses: ./.github/actions/cache-aseprite
 
