@@ -154,8 +154,10 @@ def verify_project(
 
     if source is Source.PNG:
         saves.png_image([block], set(families), ase=True, pbm=True, verbose=verbose)
+        saves.aseprite([block], png=True, pbm=False, verbose=verbose)
     elif source is Source.ASE:
         saves.aseprite([block], png=True, pbm=True, verbose=verbose)
+        saves.png_image([block], set(families), ase=True, pbm=False, verbose=verbose)
     else:
         raise ValueError(
             f"Cannot synchronize project {block["name"]!r} "
