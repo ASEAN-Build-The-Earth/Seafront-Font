@@ -212,17 +212,9 @@ def verify_project(
     original = get_tree_files(repo, head, project_prefix)
 
     if source is Source.PNG:
-        saves.png_image(
-            projects=[block],
-            family_name=set(families),
-            sync_aseprite=True,
-            verbose=verbose,
-        )
+        saves.png_image([block], set(families), ase=True, pbm=True, verbose=verbose)
     elif source is Source.ASE:
-        saves.aseprite(
-            projects=[block],
-            verbose=verbose,
-        )
+        saves.aseprite([block], png=True, pbm=True, verbose=verbose)
     else:
         raise ValueError(
             f"Cannot synchronize project {block["name"]!r} "

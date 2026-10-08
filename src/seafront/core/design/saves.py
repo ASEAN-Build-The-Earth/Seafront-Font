@@ -9,6 +9,7 @@
 Project saving strategy for aseprite/png
 """
 from importlib.resources import as_file
+from typing import Literal, overload
 
 import yaml
 import seafront.font as font
@@ -18,8 +19,32 @@ from seafront.core.design.project import find_design_layers, save_glyphs, Unicod
 from seafront.model.font import FontYML
 from seafront.unicode import UnicodeBlock
 
-def aseprite(projects: list[UnicodeBlock],
-             verbose: bool) -> None:
+@overload
+def aseprite(projects: list[UnicodeBlock], *,
+             pbm: Literal[True], png: bool=False,
+             verbose: bool=False) -> None: ...
+
+@overload
+def aseprite(projects: list[UnicodeBlock], *,
+             png: Literal[True], pbm: bool=False,
+             verbose: bool=False) -> None: ...
+
+
+def aseprite(projects: list[UnicodeBlock], *,
+             pbm: bool=True, png: bool=False,
+             verbose: bool=False) -> None:
+    """
+    Save as designs using .aseprite design files in each project.
+
+    :param projects: List of Unicode blocks to save
+    :param pbm: Saves as bitmaps (:code:`.pbm` Default)
+    :param png: Saves as PNG Images
+    :param verbose: Verbose logging
+    :return: Written to filesystem
+    """
+    if not (pbm or png):
+        print("No saves argument (pbm/png) specified, nothing to do.")
+        return
 
     for unicode_project in projects:
         block: str = unicode_project["name"]
@@ -31,33 +56,63 @@ def aseprite(projects: list[UnicodeBlock],
 
         design_aseprite = font.project_aseprite(block)
         if design_aseprite.is_file():
-            print(f"\033[32m================= \033[1m"
-                  f"(1/2) Saving '{block}' ({design_aseprite.name})\033[0m")
-            save_graphics(design_aseprite, verbose)
-
-            print(f"\033[32m================= \033[1m"
-                  f"(2/2) Exporting '{block}' ({design_aseprite.name})\033[0m")
-            export_graphics(design_aseprite, start, verbose)
+            if png:
+                print(f"\033[32m================= \033[1m"
+                      f"(1/2) Saving '{block}' ({design_aseprite.name})\033[0m")
+                save_graphics(design_aseprite, verbose)
+            if pbm:
+                print(f"\033[32m================= \033[1m"
+                      f"(2/2) Exporting '{block}' ({design_aseprite.name})\033[0m")
+                export_graphics(design_aseprite, start, verbose)
 
         ext_design_aseprite = font.project_ext_aseprite(block)
         if ext_design_aseprite.is_file():
-            print(f"\033[32m================= \033[1m"
-                  f"(1/2) Saving '{block}' ({ext_design_aseprite.name})\033[0m")
-            save_graphics(ext_design_aseprite, verbose)
+            if png:
+                print(f"\033[32m================= \033[1m"
+                      f"(1/2) Saving '{block}' ({ext_design_aseprite.name})\033[0m")
+                save_graphics(ext_design_aseprite, verbose)
 
-            print(f"\033[32m================= \033[1m"
-                  f"(2/2) Exporting '{block}' ({ext_design_aseprite.name})\033[0m")
-            export_graphics(ext_design_aseprite, start, verbose)
+            if pbm:
+                print(f"\033[32m================= \033[1m"
+                      f"(2/2) Exporting '{block}' ({ext_design_aseprite.name})\033[0m")
+                export_graphics(ext_design_aseprite, start, verbose)
+
+
+@overload
+def png_image(projects: list[UnicodeBlock],
+              family_name: set[str], *,
+              ase: Literal[True], pbm: bool=False,
+              verbose: bool=False) -> None: ...
+
+@overload
+def png_image(projects: list[UnicodeBlock],
+              family_name: set[str], *,
+              pbm: Literal[True], ase: bool = False,
+              verbose: bool = False) -> None: ...
 
 
 def png_image(projects: list[UnicodeBlock],
-              family_name: set[str],
-              sync_aseprite: bool,
-              verbose: bool) -> None:
+              family_name: set[str], *,
+              pbm: bool=True, ase: bool=False,
+              verbose: bool=False) -> None:
+    """
+    Save as designs using .png design sheets in each project.
+
+    :param projects: List of Unicode blocks to save
+    :param family_name: Set of family name selected to save
+    :param pbm: Saves as bitmaps (:code:`.pbm` Default)
+    :param ase: Saves as :code:`.aseprite` design (Required Aseprite app)
+    :param verbose: Verbose logging
+    :return: Written to filesystem
+    """
+    if not (pbm or ase):
+        print("No saves argument (pbm/ase) specified, nothing to do.")
+        return
+
     with font.font_yml().open(encoding="utf-8") as io:
         config: FontYML = yaml.safe_load(io)
 
-    layers: list[UnicodeProject] = find_design_layers(projects, family_name)
+    layers: list[UnicodeProject] = find_design_layers(projects, family_name) if pbm else []
 
     # For all Unicode project we want to save
     for i, design_layer in enumerate(layers):
@@ -79,7 +134,7 @@ def png_image(projects: list[UnicodeBlock],
                       f"for {design_layer["family_name"]} "
                       f"{config["typeface"]["style"][style]}")
 
-    if not sync_aseprite:
+    if not ase:
         return
 
     for i, unicode_project in enumerate(projects):
