@@ -1,0 +1,29 @@
+name: Setup Aseprite
+description: Restore or build the Aseprite app and add it to PATH
+inputs:
+  aseprite-sha:
+    description: Aseprite commit to build
+    required: true
+runs:
+  using: composite
+  steps:
+    # Restore from cache-aseprite action
+    - name: Restore Aseprite cache
+      id: cache
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ runner.temp }}/setup-aseprite/clone/submodules/aseprite/aseprite/build/bin
+        key: aseprite-${{ runner.os }}-${{ inputs.aseprite-sha }}
+
+    - name: Add Aseprite to PATH
+      shell: bash
+      if: steps.cache.outputs.cache-hit == 'true'
+      run: |
+        echo "${RUNNER_TEMP}/setup-aseprite/clone/submodules/aseprite/aseprite/build/bin" >> "$GITHUB_PATH"
+
+    # We fall back to neomura's setup action if our own cache doesn't hit
+    - name: Fallback Setup Aseprite
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: neomura/setup-aseprite-cli-action@v1.0.6
+      run: |
+        echo "::warning::Cache not hit, fallback build will not follow the input commit"

@@ -14,11 +14,13 @@ jobs:
   aseprite:
     name: Cache Aseprite
     runs-on: ubuntu-24.04
-    # setup-aseprite-cli-action only have tests up to ubuntu-24.04
-    # which would limited this entire workflow to it for safety
+    outputs:
+      aseprite_sha: ${{ steps.cache.outputs.aseprite-sha }}
     steps:
-      - name: Setup Aseprite
-        uses: neomura/setup-aseprite-cli-action@v1.0.6
+      - with:
+          aseprite-sha: 0123456789abcdef0123456789abcdef01234567'
+        id: cache
+        uses: ./.github/actions/cache-aseprite
 
   # Main verification
   verify:
@@ -57,9 +59,10 @@ jobs:
       - name: Install Hatch
         run: pipx install hatch
 
-      # This should restore the cache populated by the aseprite job.
       - name: Setup Aseprite
-        uses: neomura/setup-aseprite-cli-action@v1.0.6
+        uses: ./.github/actions/setup-aseprite
+        with:
+          aseprite-sha: ${{ needs.aseprite.outputs.aseprite_sha }}
 
       # Memo file name & constants we will be reporting
       - name: PR details
