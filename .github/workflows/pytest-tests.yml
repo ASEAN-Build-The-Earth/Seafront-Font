@@ -11,8 +11,8 @@ permissions:
   checks: write
 
 jobs:
-  build:
-    name: Report Tests
+  test:
+    name: Run & Report Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -26,14 +26,15 @@ jobs:
       - name: Install Hatch
         run: pipx install hatch
 
-      - name: Run tests & reports junitxml
+      - name: Run tests
         run: hatch test -- --junitxml=font/cover/TEST-${{ github.run_id }}.xml
 
-      - name: Upload PyTest test results
+      - name: Upload PyTest results
         uses: actions/upload-artifact@v7
         with:
           name: TEST-${{ github.run_id }}
           path: font/cover/TEST-${{ github.run_id }}.xml
+          archive: false
         if: ${{ always() }}
 
       - name: Report PyTest

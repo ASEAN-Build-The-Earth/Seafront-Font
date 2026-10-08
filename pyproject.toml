@@ -51,6 +51,7 @@ path = "src/seafront/__about__.py"
 [tool.pytest.ini_options]
 testpaths = ["tests/*", "src/seafront/unicode.py"]
 addopts = ["-v", "--doctest-modules"] # rn only unicode.py have doctest
+markers = ["design: design project tests"]
 
 [project.scripts]
 save-project-with = "scripts.save_project_with:main"
