@@ -13,6 +13,7 @@ import json
 from enum import StrEnum
 from pathlib import Path
 from typing import Literal, TypedDict, Iterable, overload
+from .file_changes import filter_changes, is_synced, FileChanges, ChangeTypes
 
 REPORT_DIR = Path("font/cover")
 
@@ -31,23 +32,6 @@ class Source(StrEnum):
     PBM = "pbm"
 
 
-class FileChanges[T](TypedDict):
-    """
-    Record files that is changed after the verified (from determined source) saves.
-
-    :ivar added: File exists in canonical state but not PR HEAD
-    :ivar unsync: File exists in PR HEAD but not canonical state
-    :ivar modified: File exists in both, but contents differ
-    """
-    added: list[T] | set[T]
-    unsync: list[T] | set[T]
-    modified: list[T] | set[T]
-
-
-ChangeTypes = Literal["modified", "unsync", "added"]
-"""Dict keys literal of :class:`FileChanges`"""
-
-
 SaveStatus = Literal["synced", "updated"]
 """
 Final status will either be synced (no file changed) or updated, 
@@ -55,10 +39,28 @@ updated file are the newly saved files generated from the save's determined sour
 """
 
 
+class ProjectSource(TypedDict):
+    """
+    Record files that is changed after the verified (from determined source) saves.
+
+    :ivar type: Source type of the project.
+    :ivar sync: :class:`FileChanges` available to sync all source files of this project
+    """
+    type: Literal[Source.PNG, Source.PBM, Source.ASE]
+    sync: FileChanges[str]
+
+
 class ProjectReport(TypedDict):
+    """
+    Record files that is changed after the verified (from determined source) saves.
+
+    :ivar status: Bitmap :class:`SaveStatus` of the project, synced or updated
+    :ivar source: :class:`ProjectSource` Information of this project
+    :ivar bitmap: Bitmap verified :class:`FileChanges`
+    """
     status: SaveStatus
-    source: Literal[Source.PNG, Source.PBM, Source.ASE]
-    update: FileChanges[str]
+    source: ProjectSource
+    bitmap: FileChanges[str]
 
 
 class SavesReport(TypedDict):
@@ -73,17 +75,6 @@ class SavesReport(TypedDict):
     head: str
     status: SaveStatus
     projects: dict[str, ProjectReport]
-
-
-def as_dict[T](changes: FileChanges[T]) -> FileChanges[list[T]]:
-    return {
-        "added": sorted(changes["added"]),
-        "unsync": sorted(changes["unsync"]),
-        "modified": sorted(changes["modified"]),
-    }
-
-def is_synced[T](changes: FileChanges[T]) -> bool:
-    return not (changes["added"] or changes["unsync"] or changes["modified"])
 
 
 class VerificationReport:
@@ -110,27 +101,44 @@ class VerificationReport:
     def add_project(
         self,
         block_name: str,
-        source: Source,
+        source_type: Source,
         changes: FileChanges | None = None,
     ) -> None:
-        if source is Source.PBM:
+        if source_type is Source.PBM:
             project: ProjectReport = {
                 "status": "updated",
-                "source": Source.PBM,
-                "update": {
+                "source": {
+                    "type": Source.PBM,
+                    "sync": {
+                        "added": [],
+                        "unsync": [],
+                        "modified": [],
+                    }
+                },
+                "bitmap": {
                     "added": [],
                     "unsync": [],
                     "modified": [],
-                },
+                }
             }
 
         else:
-            assert changes is not None
+            def source_filter(path_name: str):
+                return path_name.endswith(".png") or path_name.endswith(".aseprite")
 
+            def bitmap_filter(path_name: str):
+                return path_name.endswith(".pbm")
+
+            bitmap: FileChanges[str] = filter_changes(changes, bitmap_filter)
+            source: FileChanges[str] = filter_changes(changes, source_filter)
+            status: SaveStatus = "synced" if is_synced(bitmap) else "updated"
             project: ProjectReport = {
-                "status": "synced" if is_synced(changes) else "updated",
-                "source": source,
-                "update": as_dict(changes)
+                "status": status,
+                "source": {
+                    "type": source_type,
+                    "sync": source
+                },
+                "bitmap": bitmap
             }
 
         self.data["projects"][block_name] = project
@@ -188,29 +196,30 @@ class VerificationReport:
 
         # All possible title status
         has_missing_source: bool = any(
-            project["source"] is Source.PBM
+            project["source"]["type"] is Source.PBM
             for project in projects.values()
         )
 
         has_updates: bool = data["status"] == "updated"
-
         if has_missing_source:
             title = "⚠ MISSING SOURCE"
             title_message = (
-                "Some bitmap files were changed without a  source design. "
-                "These changes cannot be verified automatically."
+                "Some bitmap files were changed without a source design.<br/>"
+                "Modify the PNG design sheets or <code>design.aseprite</code> "
+                "instead of modifying generated PBM files directly"
             )
         elif has_updates:
             title = "🟡 OUT OF SYNC"
             title_message = (
-                "There are generated files that need to be synchronized "
-                "with their determined source files."
+                "There are bitmap files that need to be synchronized "
+                "with their source files."
             )
         else:
-            title = "✅ SYNCED"
+            title = "✅ ABLE TO SYNC"
             title_message = (
-                "All generated design files are synchronized with their "
-                "source files."
+                "All generated bitmap files are in sync with their "
+                "source files.<br/>If some check are not passing; patch file are"
+                "available to sync all source files."
             )
 
         # Helpers
@@ -229,32 +238,6 @@ class VerificationReport:
                 Source.PBM: "<strong>⚠ MISSING SOURCE</strong>",
             }[source_type]
 
-        def pbm_files(changes: FileChanges[str]) -> list[str]:
-            """:return: Collected .pbm files inside :class:`FileChanges`"""
-            return sorted(path for path in (
-                set(changes["added"]) | set(changes["unsync"]) | set(changes["modified"])
-            ) if path.endswith(".pbm"))
-
-        def project_source_files(project: str, changes: FileChanges[str]) -> FileChanges[Path]:
-            """:return: Sort as relative file names for simplicity and omit .pbm files"""
-            root: str = f"projects/{project}"
-            return {
-                "modified": sorted({
-                    Path(path).relative_to(root)
-                    for path in changes["modified"]
-                    if path.endswith(".png") or path.endswith(".aseprite")
-                }, reverse=True),
-                "added": sorted({
-                    Path(path).relative_to(root)
-                    for path in changes["added"]
-                    if path.endswith(".png") or path.endswith(".aseprite")
-                }, reverse=True),
-                "unsync": sorted({
-                    Path(path).relative_to(root)
-                    for path in changes["unsync"]
-                    if path.endswith(".png") or path.endswith(".aseprite")
-                }, reverse=True),
-            }
 
         # Project status table
         rows: list[str] = []
@@ -265,7 +248,7 @@ class VerificationReport:
 
         for block_name, project in projects.items():
             block: str = escape(block_name)
-            source = project["source"]
+            source = project["source"]["type"]
 
             # PBM-only source will be flagged as missing
             if source is Source.PBM:
@@ -274,33 +257,41 @@ class VerificationReport:
                 rows.append(f"  <td {t}>{source_name(source)}</td>")
                 rows.append(f"  <td colspan=\"3\" {t}>")
                 rows.append("    Bitmap (<code>.pbm</code>) files were changed without")
-                rows.append("    a PNG or Aseprite source.<br/>")
-                rows.append("    Modify the PNG design sheets or")
-                rows.append("    <code>design.aseprite</code> instead of modifying")
-                rows.append("    generated PBM files directly.")
+                rows.append("    a PNG or Aseprite source.")
                 rows.append("  </td>")
                 rows.append("</tr>")
                 continue
 
-            # Normal .png/.aseprite sources
-            sources: FileChanges[Path] = project_source_files(block_name, project["update"])
-            pbm_len: int = len(pbm_files(project["update"]))
-            types: Iterable[ChangeTypes] = sources.keys()
+            types: Iterable[ChangeTypes] = project["source"]["sync"].keys()
+            parent: str = f"projects/{project}"
+            bitmaps: FileChanges[str] = project["bitmap"]
 
-            size = { change: len(sources[change]) for change in types }
-            source_count += sum(size.values())
-            bitmap_count += pbm_len
+            # Edit source names to be relative for simplicity
+            def make_relative(change: ChangeTypes) -> list[Path]:
+                return sorted({
+                    Path(path).relative_to(parent)
+                    for path in project["source"]["sync"][change]
+                }, reverse=True) # Reverse so its ordered afet .pop()
 
-            row_span: int = max(size.values())
+            sources = { change: make_relative(change) for change in types }
+            src_lens = { change: len(sources[change]) for change in types }
+            pbm_lens = { change: len(bitmaps[change]) for change in types }
+            pbm_size: int = sum(pbm_lens.values())
+            src_size: int = sum(src_lens.values())
+
+            source_count += src_size
+            bitmap_count += pbm_size
+
+            row_span: int = max(src_lens.values())
             rows.append(f"<tr>")
             rows.append(f"  <td rowspan=\"{max(row_span, 1)}\" {t}>{block}</td>")
             rows.append(f"  <td rowspan=\"{max(row_span, 1)}\" {t}>{source_name(source)}</td>")
 
             # Nothing source-visible changed. This can happen when the only
             # canonical differences are generated PBM files.
-            if is_synced(sources):
-                if pbm_len > 0:
-                    rows.append(f"  <td colspan=\"3\" {t}>{pbm_len} Bitmap (.pbm) files not synced</td>")
+            if is_synced(project["source"]["sync"]):
+                if pbm_size > 0:
+                    rows.append(f"  <td colspan=\"3\" {t}>{pbm_size} Bitmap (.pbm) files not synced</td>")
                 rows.append(f"</tr>")
                 continue
 
@@ -314,7 +305,7 @@ class VerificationReport:
 
                 if (span := spans[check_type]) > 0:
                     # Index 0 to display label if its synced (size is 0)
-                    if index == 0 and size[check_type] == 0:
+                    if index == 0 and src_lens[check_type] == 0:
                         spans[check_type] -= 1
                         return f"  <td {t}>✅ None</td>"
 
@@ -328,7 +319,7 @@ class VerificationReport:
 
                 # Check all types and fill them in cell index
                 for check in types:
-                    file = sources[check].pop() if i < size[check] else None
+                    file = sources[check].pop() if i < src_lens[check] else None
                     if cell := td_cell(i, file, check):
                         rows.append(cell)
 
@@ -338,25 +329,35 @@ class VerificationReport:
         base: str = escape(data["base"][:7])
         head: str = escape(data["head"][:7])
 
-        if has_updates:
-            sync: list[str] = [
-                "<h3>🟡 Sync Required</h3>",
-                "<p>Generated files are out of sync with their source designs.</p>",
-                ("<p>"
-                 f" ➜ Pending: <strong>{source_count} Source files</strong> +"
-                 f" <strong>{bitmap_count} Bitmap (.pbm) files</strong><br/>"),
-            ]
+        if bitmap_count > 0 or source_count > 0:
+            source_msg = f"<strong>{source_count} Source files</strong><br/>"
+            if bitmap_count > 0:
+                plus =  f"\n + {source_msg}" if source_count > 0 else "<br/>"
+                sync: list[str] = [
+                    "<h3>🟡 Sync Required</h3>",
+                    "<p>Bitmap files required to sync for each design changes.</p>",
+                    f"<p> ➜ Pending: <strong>{bitmap_count} Bitmap (.pbm) files</strong>{plus}",
+                ]
+            else:
+                sync: list[str] = [
+                    "<h3>📦 Sync Available</h3>",
+                    "<p>Source files available to sync.</p>",
+                    f"<p> ➜ Pending: {source_msg}",
+                ]
 
             if isinstance(token, str):
                 # If we have a placeholder token, it is assumed to be the patch file's href to share
-                sync.append("  You can synchronize them by applying the generated patch:<br/>")
+                sync.append("  You can sync them by applying the generated patch:<br/>")
                 sync.append("</p>")
                 sync.append("<p>")
                 sync.append(
                     f"  <strong>Patch file:</strong> "
                     f"<a href=\"{token}\">sync-{base}-{head}.patch</a>")
                 sync.append("</p>")
-                sync.append(f"<pre><code>git apply sync-{base}-{head}.patch</code></pre>")
+                sync.append(f"<pre><code>")
+                sync.append(f"  git apply --index sync-{base}-{head}.patch")
+                sync.append(f"  git commit -m \"sync: {base}..{head}\"")
+                sync.append(f"</code></pre>")
             else:
                 sync.append("</p>")
 

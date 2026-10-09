@@ -1,0 +1,78 @@
+name: Cache Aseprite
+description: Build an cache specific Aseprite build
+inputs:
+  aseprite-sha:
+    description: Aseprite commit to build
+    required: true
+outputs:
+  aseprite-sha:
+    description: Unchanged input commit SHA for chaining
+    value: ${{ steps.post.outputs.aseprite_sha }}
+runs:
+  using: composite
+  steps:
+    - name: Restore Aseprite cache
+      id: cache
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ runner.temp }}/setup-aseprite/clone/submodules/aseprite/aseprite/build/bin
+        key: Aseprite-${{ runner.os }}-${{ inputs.aseprite-sha }}
+
+    - name: Prepare Aseprite source
+      shell: bash
+      if: steps.cache.outputs.cache-hit != 'true'
+      env:
+        NEOMURA_ACTION_REPOSITORY: neomura/setup-aseprite-cli-action
+        NEOMURA_ACTION_REF: v1.0.6
+      run: |
+        set -euo pipefail
+
+        root="${RUNNER_TEMP}/setup-aseprite"
+        rm -rf "$root"
+        mkdir -p "$root/clone"
+
+        cd "$root/clone"
+
+        git init
+        git remote add origin "https://github.com/${NEOMURA_ACTION_REPOSITORY}"
+        git fetch --depth=1 origin "${NEOMURA_ACTION_REF}:temp"
+
+    - name: Build Aseprite
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ runner.temp }}/setup-aseprite
+      run: |
+        set -euo pipefail
+        
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          sudo apt-get update
+          sudo apt-get install --yes libxcb1-dev libxcursor-dev libxi-dev libxrandr-dev libglx-dev libgl-dev libfontconfig-dev
+        fi
+
+        cd clone
+        git checkout temp
+        git submodule update --init --recursive --depth 1 submodules/aseprite/aseprite
+
+        cd submodules/aseprite/aseprite
+        git fetch origin "$ASEPRITE_COMMIT_SHA"
+        git checkout "$ASEPRITE_COMMIT_SHA"
+
+        bash ./build.sh --auto --norun
+      env:
+        ASEPRITE_COMMIT_SHA: ${{ inputs.aseprite-sha }}
+        RUNNER_OS: ${{ runner.os }}
+
+    - name: Save Aseprite as cache
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      with:
+        path: ${{ runner.temp }}/setup-aseprite/clone/submodules/aseprite/aseprite/build/bin
+        key: Aseprite-${{ runner.os }}-${{ inputs.aseprite-sha }}
+
+    - name: Post Action Output
+      id: post
+      shell: bash
+      run: |
+        echo "aseprite_sha=$ASEPRITE_COMMIT_SHA" >> "$GITHUB_OUTPUT"
+      env:
+        ASEPRITE_COMMIT_SHA: ${{ inputs.aseprite-sha }}

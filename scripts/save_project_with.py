@@ -63,14 +63,14 @@ def with_aseprite(args: SaveOption):
     if ((project := args.font) is not None or
        (project := args.project) is not None or
        (project := args.unicode) is not None):
-        aseprite(project, args.verbose)
+        aseprite(project, pbm=True, png=True, verbose=args.verbose)
 
 
 def with_png_image(args: NamedSaveOption):
     if ((project := args.font) is not None or
        (project := args.project) is not None or
        (project := args.unicode) is not None):
-        png_image(project, set(args.name), args.sync_aseprite, args.verbose)
+        png_image(project, set(args.name), pbm=True, ase=args.sync_aseprite, verbose=args.verbose)
 
 
 PNG_ADVANCED_OPTIONS = """

@@ -11,14 +11,14 @@ r""" verify_project.py
 Commandline script for workflow CI/CD verification
 """
 import argparse
-from importlib.resources.abc import Traversable
 from pathlib import Path, PurePosixPath
 from typing import Literal, Iterator
 
 import yaml
 from git import Repo
 
-from .verification import VerificationReport, Source, FileChanges, is_synced
+from .file_changes import FileChanges, is_synced, get_disk_files, compare_files
+from .verification import VerificationReport, Source
 from seafront.core.design import saves
 from seafront.font import font_yml, project_root
 from seafront.model.font import FontYML
@@ -132,65 +132,6 @@ def get_tree_files(repo: Repo, revision: str, root: str) -> dict[str, bytes]:
     return result
 
 
-def get_disk_files(directory: Traversable, root: str) -> dict[str, bytes]:
-    """
-    Read files under a filesystem directory, within a root path.
-
-    :param directory: Disk directory to traverse
-    :param root: Root path (posix)
-    :return: Dict of relative path names inside root, map to its bytes content.
-    """
-    result: dict[str, bytes] = {}
-
-    if not directory.is_dir():
-        return result
-
-    def recursive_iterdir(index: Traversable,
-                          parent: str | None=None) -> Iterator[tuple[str, Traversable]]:
-        for child in index.iterdir():
-            steps: str = child.name if (parent is None) else f"{parent}/{child.name}"
-
-            yield steps, child
-            if child.is_dir():
-                yield from recursive_iterdir(child, steps)
-
-    for (path, file) in recursive_iterdir(directory):
-        if not file.is_file():
-            continue
-
-        result[f"{root}/{path}"] = file.read_bytes()
-
-    return result
-
-
-def compare_files(
-    actual: dict[str, bytes],
-    expected: dict[str, bytes],
-) -> FileChanges:
-    """
-    Compare the PR HEAD tree against the canonical generated tree.
-
-    :param actual: /projects tree from the PR HEAD.
-    :param expected: /projects tree after applying generated files
-                     from the determined source.
-    :returns: file changes data
-    """
-    actual_paths = set(actual)
-    expected_paths = set(expected)
-
-    added = expected_paths - actual_paths
-    unsync = actual_paths - expected_paths
-
-    modified = { path for path in actual_paths
-                 & expected_paths if actual[path] != expected[path] }
-
-    return {
-        "added": added,
-        "unsync": unsync,
-        "modified": modified
-    }
-
-
 def verify_project(
     repo: Repo,
     head: str,
@@ -212,17 +153,11 @@ def verify_project(
     original = get_tree_files(repo, head, project_prefix)
 
     if source is Source.PNG:
-        saves.png_image(
-            projects=[block],
-            family_name=set(families),
-            sync_aseprite=True,
-            verbose=verbose,
-        )
+        saves.png_image([block], set(families), ase=True, pbm=True, verbose=verbose)
+        saves.aseprite([block], png=True, pbm=False, verbose=verbose)
     elif source is Source.ASE:
-        saves.aseprite(
-            projects=[block],
-            verbose=verbose,
-        )
+        saves.aseprite([block], png=True, pbm=True, verbose=verbose)
+        saves.png_image([block], set(families), ase=True, pbm=False, verbose=verbose)
     else:
         raise ValueError(
             f"Cannot synchronize project {block["name"]!r} "

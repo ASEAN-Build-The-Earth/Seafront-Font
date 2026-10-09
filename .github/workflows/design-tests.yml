@@ -1,0 +1,79 @@
+name: Design Syncs
+
+on:
+  push:
+    branches: [ main, dev, design ]
+    paths: ["projects/**", "tests/integration/**"]
+  pull_request_target:
+    branches: [ main, dev, design ]
+    types: [ opened, synchronize, reopened ]
+    paths: [ "projects/**"]
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  aseprite:
+    name: Cache Aseprite
+    runs-on: ubuntu-24.04
+    outputs:
+      aseprite_sha: ${{ steps.cache.outputs.aseprite-sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - with:
+          aseprite-sha: 331e898ef405d919539c03fd1675691cfa16c3a3
+        id: cache
+        uses: ./.github/actions/cache-aseprite
+
+  # Identical to pytest-tests.yml,
+  # but we run integration test "design" instead.
+  test:
+    name: Test /projects source files
+    needs: aseprite
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout base
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+      - name: Overlay PR /projects
+        uses: ./.github/actions/overlay-projects
+        with:
+          head-sha: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install Hatch
+        run: pipx install hatch
+
+      - name: Setup Aseprite
+        uses: ./.github/actions/setup-aseprite
+        with:
+          aseprite-sha: ${{ needs.aseprite.outputs.aseprite_sha }}
+
+      - name: Run design tests
+        run: hatch test -- -ss -m "design" --test-designs --junitxml=font/cover/SYNC-${{ github.run_id }}.xml
+
+      - name: Upload PyTest test results
+        uses: actions/upload-artifact@v7
+        with:
+          name: SYNC-${{ github.run_id }}
+          path: font/cover/SYNC-${{ github.run_id }}.xml
+          archive: false
+        if: ${{ always() }}
+
+      - name: Report PyTest
+        uses: mikepenz/action-junit-report@v6
+        if: always()
+        with:
+          check_name: PyTest Result
+          report_paths: "font/cover/SYNC-*.xml"
+          detailed_summary: true
+          include_passed: true
+          group_suite: true

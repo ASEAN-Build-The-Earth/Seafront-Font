@@ -2,48 +2,44 @@ name: Verify Design
 
 on:
   pull_request_target:
+    branches: [ main, dev, design ]
     types: [opened, synchronize, reopened]
-    paths:
-      - "projects/**"
-      - "assets/**"
-      - "font/**"
-      - "src/**"
-      - "scripts/**"
-      - "pyproject.toml"
-      - ".github/workflows/verify_design.yml"
+    paths: ["projects/**"]
 
 permissions:
   contents: read
   pull-requests: write
 
 jobs:
+  # Cache Aseprite first, it's a long app compilation  ~10minute
+  aseprite:
+    name: Cache Aseprite
+    runs-on: ubuntu-24.04
+    outputs:
+      aseprite_sha: ${{ steps.cache.outputs.aseprite-sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - with:
+          aseprite-sha: 331e898ef405d919539c03fd1675691cfa16c3a3
+        id: cache
+        uses: ./.github/actions/cache-aseprite
+
+  # Main verification
   verify:
-    name: Verify generated design files
-    runs-on: ubuntu-latest
+    name: Verify /projects design files
+    needs: aseprite
+    runs-on: ubuntu-24.04
 
     steps:
-      # Checkout the base revision
-      # IMPORTANT: For safety, please never check out any
-      #            other revision outside upstream base
-      - name: Checkout trusted base
+      - name: Checkout base
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
-
-      # Overlay only the PR's projects/design data.
-      - name: Overlay pull request projects
-        run: |
-          git checkout \
-            "${{ github.event.pull_request.head.sha }}" \
-            -- projects/
-
-      - name: Check project files
-        run: |
-          if find projects -type l -print -quit | grep -q .; then
-            echo "::error::Symlinks are not permitted in projects/"
-            exit 1
-          fi
+      - name: Overlay PR /projects
+        uses: ./.github/actions/overlay-projects
+        with:
+          head-sha: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Python
         uses: actions/setup-python@v7
@@ -54,7 +50,31 @@ jobs:
         run: pipx install hatch
 
       - name: Setup Aseprite
-        uses: neomura/setup-aseprite-cli-action@v1.0.6
+        uses: ./.github/actions/setup-aseprite
+        with:
+          aseprite-sha: ${{ needs.aseprite.outputs.aseprite_sha }}
+
+      # Memo file name & constants we will be reporting
+      - name: PR details
+        id: details
+        if: always()
+        run: |
+          BASE_SHORT="${BASE_SHA:0:7}"
+          HEAD_SHORT="${HEAD_SHA:0:7}"
+
+          echo "identifier=$SYNC_TOKEN" >> "$GITHUB_OUTPUT"
+          echo "sync_token=$IDENTIFIER" >> "$GITHUB_OUTPUT"
+
+          echo "report_name=reports-${BASE_SHORT}-${HEAD_SHORT}" >> "$GITHUB_OUTPUT"
+          echo "report_json=font/cover/saves-${BASE_SHORT}-${HEAD_SHORT}.json" >> "$GITHUB_OUTPUT"
+          echo "report_html=font/cover/saves-${BASE_SHORT}-${HEAD_SHORT}.html" >> "$GITHUB_OUTPUT
+
+          echo "patch=sync-${BASE_SHORT}-${HEAD_SHORT}.patch" >> "$GITHUB_OUTPUT"
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SYNC_TOKEN: "{{PATCH_URL}}"
+          IDENTIFIER: "design-verification"
 
       # Verify /projects directory, which saves any sync updates.
       # Report files are under font/cover/saves-{base}-{head}.(json|html)
@@ -67,11 +87,13 @@ jobs:
             --head "${HEAD_SHA}" \
             --json \
             --html \
-            --identifier="design-verification" \
-            --sync-token="{{PATCH_URL}}"
+            --identifier="$IDENTIFIER" \
+            --sync-token="$SYNC_TOKEN"
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SYNC_TOKEN: ${{ steps.details.outputs.identifier }}
+          IDENTIFIER: ${{ steps.details.outputs.sync_token }}
 
       # Build a binary git diff against the
       # PR HEAD without touching the real git index.
@@ -81,76 +103,66 @@ jobs:
         id: patch
         if: always()
         run: |
-          BASE_SHORT="${BASE_SHA:0:7}"
-          HEAD_SHORT="${HEAD_SHA:0:7}"
-
-          patch="sync-${BASE_SHORT}-${HEAD_SHORT}.patch"
           tmp_index="$(mktemp)"
 
           trap 'rm -f "$tmp_index"' EXIT
 
           GIT_INDEX_FILE="$tmp_index" git read-tree "$HEAD_SHA"
 
-          GIT_INDEX_FILE="$tmp_index" \
-            git add -A -- projects/
+          GIT_INDEX_FILE="$tmp_index" git add -A -- projects/
 
-          GIT_INDEX_FILE="$tmp_index" \
-            git diff --cached --binary "$HEAD_SHA" -- projects/ \
-            > "$patch"
-
-          echo "patch=$patch" >> "$GITHUB_OUTPUT"
+          GIT_INDEX_FILE="$tmp_index" git diff --cached \
+            --binary "$HEAD_SHA" -- projects/ > "$PATCH_FILE"
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PATCH_FILE: ${{ steps.details.outputs.patch }}
 
-      - name: Save PR details
-        id: details
-        if: always()
-        run: |
-          BASE_SHORT="${BASE_SHA:0:7}"
-          HEAD_SHORT="${HEAD_SHA:0:7}"
 
-          echo "base_short=$BASE_SHORT" >> "$GITHUB_OUTPUT"
-          echo "head_short=$HEAD_SHORT" >> "$GITHUB_OUTPUT"
-          echo "report_json=font/cover/saves-${BASE_SHORT}-${HEAD_SHORT}.json" >> "$GITHUB_OUTPUT"
-          echo "report_html=font/cover/saves-${BASE_SHORT}-${HEAD_SHORT}.html" >> "$GITHUB_OUTPUT"
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-
-      - name: Upload verification artifacts
+      # Archive report files as workflow artifact
+      - name: Upload reports
+        id: upload-reports
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: design-verification
+          name: ${{ steps.details.outputs.report_name }}
           path: |
             ${{ steps.details.outputs.report_json }}
             ${{ steps.details.outputs.report_html }}
-            ${{ steps.patch.outputs.patch }}
+
+      # Upload sync patch file as non-archive, so it's easy to download
+      - name: Upload sync patch
+        id: upload-patch
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.details.outputs.patch }}
+          path: ${{ steps.details.outputs.patch }}
+          archive: false
 
       - name: Update PR report
         if: always()
         uses: actions/github-script@v9
         env:
           REPORT_HTML: ${{ steps.details.outputs.report_html }}
-          PATCH_FILE: ${{ steps.patch.outputs.patch }}
+          PATCH_FILE: ${{ steps.upload-patch.outputs.artifact-url }}
+          SYNC_TOKEN: ${{ steps.details.outputs.identifier }}
+          IDENTIFIER: ${{ steps.details.outputs.sync_token }}
         with:
           script: |
             const fs = require("fs");
-            const marker = "<!-- design-verification -->";
-            const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}` +
-              `/actions/runs/${context.runId}/artifacts`;
-
+            const marker = "<!-- " + process.env.IDENTIFIER + " -->";
+            
             let html = fs.readFileSync(process.env.REPORT_HTML, "utf8");
-            html = html.replaceAll("{{PATCH_URL}}", artifactUrl);
+            html = html.replaceAll(process.env.SYNC_TOKEN, process.env.PATCH_FILE);
+            
             const body = html.includes(marker) ? html : `${marker}\n${html}`;
-            const { data: comments } =
-              await github.rest.issues.listComments({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                per_page: 100,
-              });
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
 
             const existing = comments.find(comment =>
               comment.user?.type === "Bot" &&
@@ -174,6 +186,6 @@ jobs:
             }
 
       # Workflow outcome will be from verify step
-      - name: Fail verification
+      - name: Fail if verify step yield negative result
         if: steps.verify.outcome != 'success'
         run: exit 1
