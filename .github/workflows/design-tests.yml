@@ -36,10 +36,16 @@ jobs:
     steps:
       - name: Checkout base
         uses: actions/checkout@v7
+        if: github.event_name == 'push'
+
+      - name: Checkout PR base
+        uses: actions/checkout@v7
+        if: github.event_name == 'pull_request_target'
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
       - name: Overlay PR /projects
+        if: github.event_name == 'pull_request_target'
         uses: ./.github/actions/overlay-projects
         with:
           head-sha: ${{ github.event.pull_request.head.sha }}
