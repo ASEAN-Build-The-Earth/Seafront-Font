@@ -2,6 +2,7 @@ name: Verify Design
 
 on:
   pull_request_target:
+    branches: [ main, dev, design ]
     types: [opened, synchronize, reopened]
     paths: ["projects/**"]
 
@@ -30,27 +31,15 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      # Checkout the base revision
-      # IMPORTANT: For safety, please never check out any
-      #            other revision outside upstream base
       - name: Checkout base
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
-      # Checkout (Overlay) ONLY the PR's projects/design data.
-      # IMPORTANT: For safety, this will be read-only by the verifier,
-      #            executing anything inside modified /projects may not be wise.
-      - name: Overlay /projects
-        run: |
-          git checkout "${{ github.event.pull_request.head.sha }}" -- projects/
-
-      - name: Check project files
-        run: |
-          if find projects -type l -print -quit | grep -q .; then
-            echo "::error::Symlinks are not permitted in projects/"
-            exit 1
-          fi
+      - name: Overlay PR /projects
+        uses: ./.github/actions/overlay-projects
+        with:
+          head-sha: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Python
         uses: actions/setup-python@v7

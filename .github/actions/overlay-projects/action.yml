@@ -1,0 +1,47 @@
+name: Overlay Design Projects
+description: Safely overlay PR projects onto the trusted base checkout
+# Note: Checkout the base revision FIRST, before overlay
+# IMPORTANT: For safety, please never check out any
+#            other revision outside upstream base
+inputs:
+  head-sha:
+    description: Head commit SHA to overlay
+    required: true
+# Checkout (Overlay) ONLY the PR's projects/design data.
+# IMPORTANT: For safety, this must be read-only by the executing workflows,
+#            executing anything inside modified /projects may not be wise.
+runs:
+  using: composite
+  steps:
+    - name: Overlay PR projects
+      shell: bash
+      env:
+        HEAD_SHA: ${{ inputs.head-sha }}
+      run: |
+        set -euo pipefail
+        
+        if [[ ! "$HEAD_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+          echo "::error::Invalid pull request head SHA"
+          exit 1
+        fi
+
+        # Only update projects/. Do not check out the PR's entire tree.
+        git checkout "$HEAD_SHA" -- projects/
+        
+    - name: Validate project files
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if [[ ! -d projects ]]; then
+          echo "::error::The projects/ directory is missing"
+          exit 1
+        fi
+
+        symlink="$(find projects -type l -print -quit)"
+
+        if [[ -n "$symlink" ]]; then
+          echo "::error::Symlinks are not permitted in projects/"
+          echo "Found: $symlink"
+          exit 1
+        fi

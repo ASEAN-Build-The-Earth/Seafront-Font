@@ -4,9 +4,10 @@ on:
   push:
     branches: [ main, dev, design ]
     paths: ["projects/**", "tests/integration/**"]
-  pull_request:
+  pull_request_target:
     branches: [ main, dev, design ]
-    paths: ["projects/**", "tests/integration/**"]
+    types: [ opened, synchronize, reopened ]
+    paths: [ "projects/**"]
 
 permissions:
   contents: read
@@ -33,7 +34,15 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout base
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+      - name: Overlay PR /projects
+        uses: ./.github/actions/overlay-projects
+        with:
+          head-sha: ${{ github.event.pull_request.head.sha }}
 
       - name: Setup Python
         uses: actions/setup-python@v7
