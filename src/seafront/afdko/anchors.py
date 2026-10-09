@@ -38,6 +38,7 @@ def export_anchor_features(
         return f"{x} {y}"
 
     # markClass declarations
+    marks_count: dict[AnchorClass, int] = { "above": 0, "below": 0 }
     lines.append("")
     for glyph_name, positioning in glyphs.items():
         anchor: AnchorPositioning = positioning["anchor"]
@@ -50,6 +51,7 @@ def export_anchor_features(
         mark_class: str = mark_classes[anchor_type]
         mark: Pixel = anchor["mark"]["base"]
         lines.append(f"markClass {glyph_name} <anchor {pack(mark)}> {mark_class};")
+        marks_count[anchor_type] += 1
 
     # Base to mark anchoring
     lines.append("")
@@ -65,7 +67,7 @@ def export_anchor_features(
         rules: list[str] = []
 
         for mark_type in ("above", "below"):
-            if mark_type not in base:
+            if mark_type not in base or marks_count[mark_type] == 0:
                 continue
 
             position: Pixel = base[mark_type]

@@ -1,153 +1,60 @@
-uni00C0:
-  anchor: BASE
-  pos: [0, 8]
-uni00C1:
-  anchor: BASE
-  pos: [0, 8]
-uni00C2:
-  anchor: BASE
-  pos: [0, 8]
-uni00C3:
-  anchor: BASE
-  pos: [0, 8]
-uni00C4:
-  anchor: BASE
-  pos: [0, 8]
-uni00C5:
-  anchor: BASE
-  pos: [0, 8]
-uni00C8:
-  anchor: BASE
-  pos: [0, 8]
-uni00C9:
-  anchor: BASE
-  pos: [0, 8]
-uni00CA:
-  anchor: BASE
-  pos: [0, 8]
-uni00CB:
-  anchor: BASE
-  pos: [0, 8]
-uni00CC:
-  anchor: BASE
-  pos: [0, 8]
-uni00CD:
-  anchor: BASE
-  pos: [0, 8]
-uni00CE:
-  anchor: BASE
-  pos: [0, 8]
-uni00CF:
-  anchor: BASE
-  pos: [0, 8]
-uni00D1:
-  anchor: BASE
-  pos: [0, 8]
-uni00D2:
-  anchor: BASE
-  pos: [0, 8]
-uni00D3:
-  anchor: BASE
-  pos: [0, 8]
-uni00D4:
-  anchor: BASE
-  pos: [0, 8]
-uni00D5:
-  anchor: BASE
-  pos: [0, 8]
-uni00D6:
-  anchor: BASE
-  pos: [0, 8]
-uni00D9:
-  anchor: BASE
-  pos: [0, 8]
-uni00DA:
-  anchor: BASE
-  pos: [0, 8]
-uni00DB:
-  anchor: BASE
-  pos: [0, 8]
-uni00DC:
-  anchor: BASE
-  pos: [0, 8]
-uni00DD:
-  anchor: BASE
-  pos: [0, 8]
-uni00E0:
-  anchor: BASE
-  pos: [0, 2]
-uni00E1:
-  anchor: BASE
-  pos: [0, 2]
-uni00E2:
-  anchor: BASE
-  pos: [0, 2]
-uni00E3:
-  anchor: BASE
-  pos: [0, 2]
-uni00E4:
-  anchor: BASE
-  pos: [0, 2]
-uni00E5:
-  anchor: BASE
-  pos: [0, 2]
-uni00E8:
-  anchor: BASE
-  pos: [0, 2]
-uni00E9:
-  anchor: BASE
-  pos: [0, 2]
-uni00EA:
-  anchor: BASE
-  pos: [0, 2]
-uni00EB:
-  anchor: BASE
-  pos: [0, 2]
-uni00EC:
-  anchor: BASE
-  pos: [0, 2]
-uni00ED:
-  anchor: BASE
-  pos: [0, 2]
-uni00EE:
-  anchor: BASE
-  pos: [0, 2]
-uni00EF:
-  anchor: BASE
-  pos: [0, 2]
-uni00F1:
-  anchor: BASE
-  pos: [0, 2]
-uni00F2:
-  anchor: BASE
-  pos: [0, 2]
-uni00F3:
-  anchor: BASE
-  pos: [0, 2]
-uni00F4:
-  anchor: BASE
-  pos: [0, 2]
-uni00F5:
-  anchor: BASE
-  pos: [0, 2]
-uni00F6:
-  anchor: BASE
-  pos: [0, 2]
-uni00F9:
-  anchor: BASE
-  pos: [0, 2]
-uni00FA:
-  anchor: BASE
-  pos: [0, 2]
-uni00FB:
-  anchor: BASE
-  pos: [0, 2]
-uni00FC:
-  anchor: BASE
-  pos: [0, 2]
-uni00FD:
-  anchor: BASE
-  pos: [0, 2]
-uni00FF:
-  anchor: BASE
-  pos: [0, 2]
+groups:
+  capital-combining:
+    pos: [0, 8]
+    anchor: BASE
+    glyphs:
+      - uni00C0
+      - uni00C1
+      - uni00C2
+      - uni00C3
+      - uni00C4
+      - uni00C5
+      - uni00C8
+      - uni00C9
+      - uni00CA
+      - uni00CB
+      - uni00CC
+      - uni00CD
+      - uni00CE
+      - uni00CF
+      - uni00D1
+      - uni00D2
+      - uni00D3
+      - uni00D4
+      - uni00D5
+      - uni00D6
+      - uni00D9
+      - uni00DA
+      - uni00DB
+      - uni00DC
+      - uni00DD
+  lowercase-combining:  
+    pos: [0, 2]
+    anchor: BASE
+    glyphs:
+      - uni00E0
+      - uni00E1
+      - uni00E2
+      - uni00E3
+      - uni00E4
+      - uni00E5
+      - uni00E8
+      - uni00E9
+      - uni00EA
+      - uni00EB
+      - uni00EC
+      - uni00ED
+      - uni00EE
+      - uni00EF
+      - uni00F1
+      - uni00F2
+      - uni00F3
+      - uni00F4
+      - uni00F5
+      - uni00F6
+      - uni00F9
+      - uni00FA
+      - uni00FB
+      - uni00FC
+      - uni00FD
+      - uni00FF
