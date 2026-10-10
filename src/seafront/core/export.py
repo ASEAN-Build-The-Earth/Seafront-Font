@@ -212,6 +212,7 @@ def export(export_fn: Callable[[str], Path],
     fb.setupHorizontalMetrics(glyph["metrics"]) # The default advancing width
     fb.setupHorizontalHeader(ascent=ascent, descent=-descend)
 
+    fsStyle, usWeight = (0x20, 700) if font_export["face"] == "bold" else (0x40, 500)
     fb.setupOS2(
         sTypoAscender=ascent,
         sTypoDescender=-descend,
@@ -220,10 +221,14 @@ def export(export_fn: Callable[[str], Path],
         sxHeight=x_height,
         sCapHeight=cap_height,
         fsType=0, # 0: Installable embedding, 2: Restricted License embedding, 4: Preview & Print embedding, 8: Editable embedding
-        fsSelection=0x40, # "bold italic": 0x21, "bold": 0x20, "italic": 0x01, "regular": 0x40
-        usWeightClass=500, # Medium weight, as our font is kind of thick by design
+        fsSelection=fsStyle, # "bold italic": 0x21, "bold": 0x20, "italic": 0x01, "regular": 0x40
+        usWeightClass=usWeight, # Medium weight, as our font is kind of thick by design
         usWidthClass=5 # Normal width, we won't have condensed or expanded width
     )
+    # OS/2 CodePage ranges, FontBuilder doesn't do this by default for whatever reason
+    # This marks the range of Unicodes Microsoft app like MsWord are able to display
+    os2 = fb.font["OS/2"]
+    os2.recalcCodePageRanges(fb.font)
 
     license_desc: list[str] = about.__license__.splitlines()
     license_info: str = license_desc[len(license_desc) - 1]
