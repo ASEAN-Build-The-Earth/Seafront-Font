@@ -17,7 +17,7 @@ from .extract import extract, chain, simplify, Edge
 
 from sys import stderr
 
-from ..model.anchors import GlyphsPositioning, AnchorPositioning
+from ..model.positioning import GlyphsPositioning, AnchorPositioning
 from ..model.font import TypefaceAccent, DefaultAnchors
 from ..model.glyphs import GlyphsTable, GlyphMetric, GlyphProfile
 
@@ -116,19 +116,20 @@ def build_glyph(pbm: Traversable,
     x_anchor: int = 0
     anchor: AnchorPositioning | None = None
     default_anchors: DefaultAnchors = profile["typography"]["anchors"]
-    profile_anchors: dict[str, GlyphsPositioning] | None = profile["anchors"]
-    if isinstance(profile_anchors, dict):
+    profile_positioning: dict[str, GlyphsPositioning] | None = profile["positioning"]
+    if isinstance(profile_positioning, dict):
         # If this glyph has anchor configuration
-        if glyph_name in profile_anchors:
-            positioning: GlyphsPositioning = profile_anchors[glyph_name]
+        if glyph_name in profile_positioning:
+            positioning = profile_positioning[glyph_name]
             anchor = positioning["anchor"]
-            glyph_class = positioning["anchor"]["type"]
+            if anchor is not None:
+                glyph_class = anchor["type"]
 
-            if glyph_class == "above" or glyph_class == "below":
-                y_anchor += default_anchors["mark"][glyph_class]
+                if glyph_class == "above" or glyph_class == "below":
+                    y_anchor += default_anchors["mark"][glyph_class]
 
-            x_anchor += int(positioning["pos"]["x"])
-            y_anchor += int(positioning["pos"]["y"])
+                x_anchor += int(positioning["pos"]["x"])
+                y_anchor += int(positioning["pos"]["y"])
 
     with pbm.open("rb") as io:
         bitmap = Image.open(io)

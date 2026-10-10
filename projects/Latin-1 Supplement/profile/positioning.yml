@@ -1,3 +1,9 @@
+lookup:
+  mark: markLatin1BaseToMarkLookup
+  mkmk: mkmkLatin1MarkToMarkLookup
+marker:
+  above: Latin1AboveMarks
+  below: Latin1BelowMarks
 groups:
   capital-combining:
     pos: [0, 8]

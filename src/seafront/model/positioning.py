@@ -6,11 +6,11 @@
 # This license is available with a FAQ at:
 # https://openfontlicense.org
 """\
-Anchoring data model
+Positioning data model
 """
 from sys import stderr
-from typing import TypedDict
-from seafront.model.font import BaseLabel, MarkClass, BaseClass, MarkLabel
+from typing import TypedDict, Literal, Any
+from .font import BaseLabel, MarkClass, BaseClass, MarkLabel, MkMkLabel
 
 # Glyph classes string Literals
 AnchorClass = BaseLabel | MarkClass
@@ -41,15 +41,27 @@ class GlyphsPositioning(TypedDict):
     :ivar anchor: The anchors class of this glyph
     :ivar pos: The glyph position (additive) in font metrics
     """
-    anchor: AnchorPositioning
+    anchor: AnchorPositioning | None
     pos: Pixel
 
 
-GlyphAnchors = dict[str, GlyphsPositioning]
+GlyphsPosTable = dict[str, GlyphsPositioning]
 """
 Glyphs anchoring data model, 
 maps each glyph name to its positioning data.
 """
+
+
+class PositioningProfile(TypedDict):
+    lookup: dict[MkMkLabel | MarkLabel, str]
+    marker: dict[MarkClass, str]
+    positioning: dict[str, GlyphsPositioning]
+
+
+class KerningProfile(TypedDict):
+    lookup: dict[Literal["name"], str]
+    groups: dict[str, list[str]]
+    glyphs: dict[str, dict[str, int]]
 
 
 def zero() -> Pixel:
@@ -161,16 +173,15 @@ def _add_groups(result: dict[str, GlyphsPositioning], name: str, group):
                   f"as a list or string name\033[0m", file=stderr)
 
 
-def parse_glyph_anchors(anchors_yml: dict) -> GlyphAnchors:
+def _parse_glyph_positioning(groups, glyphs) -> GlyphsPosTable:
     """
     Parse Unicode block's profile/anchors.yml
 
-    :param anchors_yml: anchors.yml file
-    :return: Glyph positioning dictionary
+    :param groups: Glyph groupings
+    :param glyphs: Glyph table
+    :return: Glyph positioning table
     """
     result: dict[str, GlyphsPositioning] = {}
-    groups = anchors_yml.get("groups", None)
-    glyphs = anchors_yml.get("anchors", None)
 
     if glyphs is None and groups is None:
         print(f"\033[93mWARNING: No anchors config found. "
@@ -192,3 +203,57 @@ def parse_glyph_anchors(anchors_yml: dict) -> GlyphAnchors:
         return result
 
     return result
+
+
+def parse_horizontal_kerning(feature_index: int,
+                             kerning_yml: dict) -> KerningProfile:
+    """
+    :param feature_index: Index identifier of this feature
+    :param kerning_yml: :code:`kerning.yml` profile file
+    :return: Horizontal kerning profile
+    """
+    def name(fallback: str) -> dict[Literal["name"], str]:
+        if (isinstance(lookup := kerning_yml.get("lookup", {}), dict)
+        and isinstance(lookup_name := lookup.get("name", fallback), str)):
+            return { "name": lookup_name }
+        elif isinstance(lookup, str):
+            return { "name": lookup }
+        else:
+            return { "name": fallback }
+
+    return {
+        "lookup": name(f"kernHorizontalKerninglookup{feature_index}"),
+        "groups": kerning_yml.get("groups", {}),
+        "glyphs": kerning_yml.get("glyphs", {})
+    }
+
+
+def parse_glyph_positioning(feature_index: int,
+                            positioning_yml: dict) -> PositioningProfile:
+    """
+    :param feature_index: Index identifier of this feature
+    :param positioning_yml: :code:`positioning.yml` profile file
+    :return: Glyphs positioning profile
+    """
+
+    def name(yml: Any, key: str, fallback: str):
+        return yml.get(key, fallback) if isinstance(yml, dict) else fallback
+
+    marker = positioning_yml.get("marker", {})
+    lookup = positioning_yml.get("lookup", {})
+    positioning_table: GlyphsPosTable = _parse_glyph_positioning(
+        positioning_yml.get("groups", None),
+        positioning_yml.get("glyphs", None)
+    )
+
+    return {
+        "positioning": positioning_table,
+        "lookup": {
+            "mark": name(lookup, "mark", f"markMarkPositioninglookup{feature_index}"),
+            "mkmk": name(lookup, "mkmk", f"mkmkMarktoMarklookup{feature_index}")
+        },
+        "marker": {
+            "above": name(marker, "above", f"Anchor{feature_index}_AboveMarks"),
+            "below": name(marker, "below", f"Anchor{feature_index}_BelowMarks")
+        }
+    }

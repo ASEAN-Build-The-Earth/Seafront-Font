@@ -19,9 +19,9 @@ from sys import stderr
 from .glyphs import build_glyph
 from ..font import FONT_DIR
 from ..unicode import load_unicode_blocks, UnicodeBlock
-from ..afdko.anchors import export_anchor_features
+from ..afdko.positioning import export_positioning_features
 from ..afdko.kerning import export_kerning_feat
-from ..model.anchors import parse_glyph_anchors, GlyphAnchors
+from ..model.positioning import parse_glyph_positioning, GlyphsPosTable, PositioningProfile, parse_horizontal_kerning
 from ..model.font import TypefaceStyles, FontInfo, FontData, TypographyData, TypefaceAccent
 
 import seafront.model.glyphs as glyphs
@@ -98,12 +98,12 @@ def export(export_fn: Callable[[str], Path],
     glyph: glyphs.GlyphsTable = glyphs.prepare_glyphs(units_per_em // 2)  # Defaulting half an em per glyph for .notdef
     built: int = 0
 
-    anchors_feature: dict[str, GlyphAnchors] = {}
+    positioning_fea: dict[str, PositioningProfile] = {}
     kerning_feature: dict[str, Traversable]  = {}
     unicode_missing: tuple[str, str] | None  = None
 
     try:
-        for block_name in font_data["unicode-blocks"]:
+        for i, block_name in enumerate(font_data["unicode-blocks"]):
             face = font_export["face"]
 
             glyph_dir = font.project_glyphs(block_name, family_name, face)
@@ -112,23 +112,23 @@ def export(export_fn: Callable[[str], Path],
                     unicode_missing = (block_name, rf"{missing_path}")
                 continue
 
-            anchors_yml: Traversable = font.anchors_yml(block_name)
+            positioning_yml: Traversable = font.anchors_yml(block_name)
             kerning_yml: Traversable = font.kerning_yml(block_name)
 
-            def load_anchors() -> GlyphAnchors:
-                glyph_anchors = parse_glyph_anchors(load_yaml(anchors_yml))
-                anchors_feature[block_name] = glyph_anchors
-                return glyph_anchors
+            def load_positioning() -> GlyphsPosTable:
+                positioning = parse_glyph_positioning(i, load_yaml(positioning_yml))
+                positioning_fea[block_name] = positioning
+                return positioning["positioning"]
 
             # Kerning feature is processed purely under OpenType feature
             if kerning_yml.is_file():
                 kerning_feature[block_name] = kerning_yml
 
             # Anchors positioning required to adjust each glyph if configured
-            anchors: GlyphAnchors | None = load_anchors() if anchors_yml.is_file() else None
+            pos_table: GlyphsPosTable | None = load_positioning() if positioning_yml.is_file() else None
             glyph_profile: glyphs.GlyphProfile = {
                 "pixel_size": pixel_size,
-                "anchors": anchors,
+                "positioning": pos_table,
                 "verbose": v,
                 "typeface": face,
                 "typography": profile["typography"],
@@ -307,23 +307,23 @@ def export(export_fn: Callable[[str], Path],
         fea_full.append("")
 
     # Collect anchoring features
-    for block_name, feature in anchors_feature.items():
+    for i, (block_name, feature) in enumerate(positioning_fea.items()):
         log(v, f"Exporting anchoring feature for: {block_name}")
-        anchor_txt = export_anchor_features(
+        positioning_txt = export_positioning_features(
             feature,
             upm=units_per_em,
+            index=i,
             pixel_size=pixel_size,
         )
-        log(v, anchor_txt)
-        fea_full.append(anchor_txt)
+        log(v, positioning_txt)
+        fea_full.append(positioning_txt)
 
     # Collect kerning features
-    for block_name, kerning_path in kerning_feature.items():
+    for i, (block_name, kerning_path) in enumerate(kerning_feature.items()):
         log(v, f"Exporting kerning feature for: {block_name}")
-        kerning = load_yaml(kerning_path)
+        kerning = parse_horizontal_kerning(i, load_yaml(kerning_path))
         fea_txt = export_kerning_feat(
-            kerning["groups"],
-            kerning["kerning"],
+            kerning,
             upm=units_per_em,
             pixel_size=pixel_size,
         )
