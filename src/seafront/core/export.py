@@ -16,7 +16,7 @@ from importlib.resources import as_file
 from importlib.resources.abc import Traversable
 
 from sys import stderr
-from .glyphs import build_glyph
+from .glyphs import build_glyph, build_if_special_unicode
 from ..font import FONT_DIR
 from ..unicode import load_unicode_blocks, UnicodeBlock
 from ..afdko.positioning import export_positioning_features
@@ -138,6 +138,12 @@ def export(export_fn: Callable[[str], Path],
             start: int = blocks[block_name]["start"]
             for index in range(blocks[block_name]["end"] - start + 1):
                 codepoint: int = start + index
+
+                if (is_special := build_if_special_unicode(codepoint, glyph, glyph_profile)) == 1:
+                    built += is_special
+                    log(v, f"Built Glyph: U+{codepoint:04X} (Special character)")
+                    continue
+
                 pbm = glyph_dir / f"{glyphs.get_glyph_label(codepoint)}.pbm"
                 if not pbm.is_file():
                     log(v, f"Skipping Glyph: U+{codepoint:04X} (No PBM file)")
