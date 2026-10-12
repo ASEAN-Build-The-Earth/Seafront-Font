@@ -38,7 +38,7 @@ class GlyphsPositioning(TypedDict):
     """
     Glyph positioning data type
 
-    :ivar anchor: The anchors class of this glyph
+    :ivar anchor: :class:`AnchorPositioning` of this glyph (Optional)
     :ivar pos: The glyph position (additive) in font metrics
     """
     anchor: AnchorPositioning | None
@@ -53,13 +53,27 @@ maps each glyph name to its positioning data.
 
 
 class PositioningProfile(TypedDict):
+    """
+    Parsed positioning profile
+
+    :ivar lookup: names for the built lookup tables
+    :ivar marker: named for the built marker classes
+    :ivar positioning: Map of glyphs name to its :class:`GlyphsPositioning`
+    """
     lookup: dict[MkMkLabel | MarkLabel, str]
     marker: dict[MarkClass, str]
-    positioning: dict[str, GlyphsPositioning]
+    positioning: GlyphsPosTable
 
 
 class KerningProfile(TypedDict):
-    lookup: dict[Literal["name"], str]
+    """
+    Parsed horizontal kerning profile
+
+    :ivar lookup: lookup table :code:`name` and :code:`flag`
+    :ivar groups: Kerning groups
+    :ivar glyphs: Map of glyphs name to its kerning groups' value
+    """
+    lookup: dict[Literal["name", "flag"], str]
     groups: dict[str, list[str]]
     glyphs: dict[str, dict[str, int]]
 
@@ -69,7 +83,7 @@ def zero() -> Pixel:
     return { "x": 0, "y": 0 }
 
 
-def parse_position(pos: Pixel | dict | list | None) -> Pixel:
+def parse_position(pos: Pixel | dict | list | tuple | None) -> Pixel:
     """
     Parse supported value as :class:`Pixel` of x, y.
 
@@ -79,7 +93,7 @@ def parse_position(pos: Pixel | dict | list | None) -> Pixel:
     if isinstance(pos, dict):
         x: int = int( pos.get("x", 0) )
         y: int = int( pos.get("y", 0) )
-    elif isinstance(pos, list):
+    elif isinstance(pos, list) or isinstance(pos, tuple):
         x: int = int( pos[0] ) if len(pos) > 0 else 0
         y: int = int( pos[1] ) if len(pos) > 1 else 0
     else:
@@ -212,14 +226,15 @@ def parse_horizontal_kerning(feature_index: int,
     :param kerning_yml: :code:`kerning.yml` profile file
     :return: Horizontal kerning profile
     """
-    def name(fallback: str) -> dict[Literal["name"], str]:
+    def name(fallback: str) -> dict[Literal["name", "flag"], str]:
         if (isinstance(lookup := kerning_yml.get("lookup", {}), dict)
         and isinstance(lookup_name := lookup.get("name", fallback), str)):
-            return { "name": lookup_name }
+            flag: str = lookup.get("flag", "0")
+            return { "name": lookup_name, "flag": flag }
         elif isinstance(lookup, str):
-            return { "name": lookup }
+            return { "name": lookup, "flag": "0" }
         else:
-            return { "name": fallback }
+            return { "name": fallback, "flag": "0" }
 
     return {
         "lookup": name(f"kernHorizontalKerninglookup{feature_index}"),
@@ -235,7 +250,6 @@ def parse_glyph_positioning(feature_index: int,
     :param positioning_yml: :code:`positioning.yml` profile file
     :return: Glyphs positioning profile
     """
-
     def name(yml: Any, key: str, fallback: str):
         return yml.get(key, fallback) if isinstance(yml, dict) else fallback
 
