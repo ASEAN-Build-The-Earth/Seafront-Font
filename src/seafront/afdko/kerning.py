@@ -12,17 +12,31 @@ from ..model.positioning import KerningProfile
 from io import StringIO
 from sys import stderr
 
-from fontTools.feaLib.parser import Parser as FeatureParser
+from fontTools.feaLib.parser import Parser as FeatureParser, SymbolTable
 from fontTools.feaLib.error import FeatureLibError
 import fontTools.feaLib.ast as ast
 
 
-def get_lookup_statement(lookup: str) -> ast.LookupFlagStatement:
+def _create_statement_parser(statement: StringIO):
+    class PassSymbol(SymbolTable):
+        """
+        Pass :code:`@` prefixed markers as :class:`ast.MarkClass`
+        without guarding if the marker exists or not.
+        """
+        def resolve(self, name):
+            return ast.MarkClass(name)
+
+    ast_parser = FeatureParser(statement)
+    ast_parser.glyphclasses_ = PassSymbol()
+    ast_parser.advance_lexer_()
+    return ast_parser
+
+
+def _get_lookup_statement(lookup: str) -> ast.LookupFlagStatement:
     try:
         definition = lookup if lookup.startswith("lookupflag") else f"lookupflag {lookup}"
         lookupflag = definition if definition.endswith(";") else f"{definition};"
-        ast_parser = FeatureParser(StringIO(lookupflag))
-        ast_parser.advance_lexer_(comments=True)
+        ast_parser = _create_statement_parser(StringIO(lookupflag))
         return ast_parser.parse_lookupflag_()
     except (FeatureLibError, AssertionError) as error:
         print(f"\033[93mWARNING: Unable to parse lookup flag: '{lookup}' ({error})\033[0m", file=stderr)
@@ -43,7 +57,7 @@ def export_kerning_feat(
     """
     # Exported features will be of one lookup block
     kern_lookup = ast.LookupBlock(kerning["lookup"]["name"])
-    lookup_flag = get_lookup_statement(kerning["lookup"]["flag"])
+    lookup_flag = _get_lookup_statement(kerning["lookup"]["flag"])
     kern_lookup.statements.append(lookup_flag)
 
     groups: dict[str, list[str]] = {} # Dict of group name to glyph list
