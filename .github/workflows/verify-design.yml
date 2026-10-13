@@ -67,7 +67,7 @@ jobs:
 
           echo "report_name=reports-${BASE_SHORT}-${HEAD_SHORT}" >> "$GITHUB_OUTPUT"
           echo "report_json=font/cover/saves-${BASE_SHORT}-${HEAD_SHORT}.json" >> "$GITHUB_OUTPUT"
-          echo "report_html=font/cover/saves-${BASE_SHORT}-${HEAD_SHORT}.html" >> "$GITHUB_OUTPUT
+          echo "report_html=font/cover/saves-${BASE_SHORT}-${HEAD_SHORT}.html" >> "$GITHUB_OUTPUT"
 
           echo "patch=sync-${BASE_SHORT}-${HEAD_SHORT}.patch" >> "$GITHUB_OUTPUT"
         env:

@@ -30,6 +30,10 @@ import yaml
 
 ADVANCED_OPTIONS = """
 \033[1m\033[95madvanced options:\033[0m
+  \033[1m\033[32m-w\033[0m, \033[1m\033[96m--with-debg \33[33m{fea,json}\033[0m
+                        Export additional debugging file:
+                        - \033[1m\033[32mfea\033[0m : Compiled AFDKO Opentype features file.
+                        - \033[1m\033[32mjson\033[0m : Simplified font metadata as JSON file.
   \033[1m\033[32m-i\033[0m, \033[1m\033[96m--identifier \33[33m[IDENTIFIER]\033[0m
                         The font's version number to export, formatted as 3 decimals float ex. 1.000
   \033[1m\033[32m-s\033[0m, \033[1m\033[96m--scale \33[33m{base,half,full}\033[0m
@@ -60,6 +64,12 @@ def main():
     parser.add_argument('-v', "--verbose",
         action="store_true",
         help="log verbose outputs",
+    )
+
+    parser.add_argument('-w', "--with-debg",
+        choices=["fea", "json"],
+        nargs="+",
+        help=argparse.SUPPRESS,
     )
 
     parser.add_argument('-i', "--identifier",
@@ -151,10 +161,11 @@ def main():
         font_info["version"] = args.identifier
 
     font: FontExport = {
+        "debug": set(),
         "style": config["typeface"]["style"][face],
         "info": font_info,
         "name": args.font,
-        "face": face
+        "face": face,
     }
     profile: FontProfile = {
         "typography": config["profile"]["typography"],
@@ -163,16 +174,16 @@ def main():
         "verbose": args.verbose
     }
 
-    if args.verbose:
-        print("Export Profile: ", font, profile)
+    if isinstance(args.with_debg, list):
+        font["debug"].update(args.with_debg)
 
-    def export_fn(generated_name: str):
+    def export_fn(generated_name: str, ext: str):
         if args.output is None:
-            filename = f"{generated_name}.ttf"
-        elif str(args.output).endswith(".ttf"):
+            filename = generated_name + ext
+        elif str(args.output).endswith(ext):
             filename = args.output
         else:
-            filename = f"{args.output}.ttf"
+            filename = args.output + ext
 
         with as_file(FONT_DIR / "export") as export_path:
             export_path.mkdir(exist_ok=True)

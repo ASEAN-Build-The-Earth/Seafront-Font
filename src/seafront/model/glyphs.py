@@ -13,7 +13,7 @@ from typing import TypedDict, NamedTuple, Any, Literal
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 
 from seafront.generate import COLUMN_SIZE
-from seafront.model.anchors import GlyphAnchors
+from seafront.model.positioning import GlyphsPosTable
 from seafront.model.font import TypographyData, TypefaceStyles, TypefaceAccent
 from seafront.unicode import parse_codepoint
 
@@ -100,14 +100,14 @@ class GlyphProfile(TypedDict):
 
     :ivar verbose: True for verbose printing
     :ivar pixel_size: Pixel size per upm
-    :ivar anchors: Anchoring profile if exist
+    :ivar positioning: Glyph positioning table if exist
     :ivar typeface: The style of this glyph
     :ivar typography: Typography shared data/constants
     :ivar accent: Accent data ascender:descender size
     """
     verbose: bool
     pixel_size: int
-    anchors: GlyphAnchors | None
+    positioning: GlyphsPosTable | None
     typeface: TypefaceStyles
     typography: TypographyData
     accent: TypefaceAccent

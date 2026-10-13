@@ -9,26 +9,25 @@
 Font exporting implementations
 """
 from pathlib import Path
-from typing import TypedDict, Callable
+from typing import TypedDict, Callable, Literal
 
 from fontTools.fontBuilder import FontBuilder
 from importlib.resources import as_file
 from importlib.resources.abc import Traversable
 
 from sys import stderr
-from .glyphs import build_glyph
-from ..font import FONT_DIR
+from .glyphs import build_glyph, build_if_special_unicode
 from ..unicode import load_unicode_blocks, UnicodeBlock
-from ..afdko.anchors import export_anchor_features
-from ..afdko.kerning import export_kerning_feat
-from ..model.anchors import parse_glyph_anchors, GlyphAnchors
+from ..afdko.export import dump_features
+from ..model.positioning import parse_glyph_positioning, GlyphsPosTable, PositioningProfile
 from ..model.font import TypefaceStyles, FontInfo, FontData, TypographyData, TypefaceAccent
 
 import seafront.model.glyphs as glyphs
 import seafront.__about__ as about
 import seafront.font as font
 import yaml
-
+import json
+import re
 
 def log(verbose=False, *args):
     if verbose:
@@ -44,11 +43,13 @@ class FontExport(TypedDict):
     """
     Information of the font to export.
 
+    :ivar debug: Whether to export additional debugging file
     :ivar style: The style name of this Font
     :ivar name: The name of this Font
     :ivar info: Metadata infos
     :ivar face: The style name identifier
     """
+    debug: set[Literal["json", "fea"]]
     style: str
     name: str
     info: FontInfo
@@ -68,14 +69,14 @@ class FontProfile(TypedDict):
     typography: TypographyData
 
 
-def export(export_fn: Callable[[str], Path],
+def export(export_fn: Callable[[str, str], Path],
            font_export: FontExport,
            font_data: FontData,
            profile: FontProfile):
     """
     Export font as TrueType .ttf file
 
-    :param export_fn: Function to translate (str) generated name into export file Path
+    :param export_fn: Function to translate (name, ext) generated name into export file Path
     :param font_export: Font's exporting information
     :param font_data: Font metadata information
     :param profile: Typeface profile
@@ -98,12 +99,12 @@ def export(export_fn: Callable[[str], Path],
     glyph: glyphs.GlyphsTable = glyphs.prepare_glyphs(units_per_em // 2)  # Defaulting half an em per glyph for .notdef
     built: int = 0
 
-    anchors_feature: dict[str, GlyphAnchors] = {}
+    positioning_fea: dict[str, PositioningProfile] = {}
     kerning_feature: dict[str, Traversable]  = {}
     unicode_missing: tuple[str, str] | None  = None
 
     try:
-        for block_name in font_data["unicode-blocks"]:
+        for i, block_name in enumerate(font_data["unicode-blocks"]):
             face = font_export["face"]
 
             glyph_dir = font.project_glyphs(block_name, family_name, face)
@@ -112,23 +113,23 @@ def export(export_fn: Callable[[str], Path],
                     unicode_missing = (block_name, rf"{missing_path}")
                 continue
 
-            anchors_yml: Traversable = font.anchors_yml(block_name)
+            positioning_yml: Traversable = font.positioning_yml(block_name)
             kerning_yml: Traversable = font.kerning_yml(block_name)
 
-            def load_anchors() -> GlyphAnchors:
-                glyph_anchors = parse_glyph_anchors(load_yaml(anchors_yml))
-                anchors_feature[block_name] = glyph_anchors
-                return glyph_anchors
+            def load_positioning() -> GlyphsPosTable:
+                positioning = parse_glyph_positioning(i, load_yaml(positioning_yml))
+                positioning_fea[block_name] = positioning
+                return positioning["positioning"]
 
             # Kerning feature is processed purely under OpenType feature
             if kerning_yml.is_file():
                 kerning_feature[block_name] = kerning_yml
 
             # Anchors positioning required to adjust each glyph if configured
-            anchors: GlyphAnchors | None = load_anchors() if anchors_yml.is_file() else None
+            pos_table: GlyphsPosTable | None = load_positioning() if positioning_yml.is_file() else None
             glyph_profile: glyphs.GlyphProfile = {
                 "pixel_size": pixel_size,
-                "anchors": anchors,
+                "positioning": pos_table,
                 "verbose": v,
                 "typeface": face,
                 "typography": profile["typography"],
@@ -138,6 +139,12 @@ def export(export_fn: Callable[[str], Path],
             start: int = blocks[block_name]["start"]
             for index in range(blocks[block_name]["end"] - start + 1):
                 codepoint: int = start + index
+
+                if (is_special := build_if_special_unicode(codepoint, glyph, glyph_profile)) == 1:
+                    built += is_special
+                    log(v, f"Built Glyph: U+{codepoint:04X} (Special character)")
+                    continue
+
                 pbm = glyph_dir / f"{glyphs.get_glyph_label(codepoint)}.pbm"
                 if not pbm.is_file():
                     log(v, f"Skipping Glyph: U+{codepoint:04X} (No PBM file)")
@@ -210,20 +217,27 @@ def export(export_fn: Callable[[str], Path],
     fb.setupCharacterMap(glyph["cmap"])
     fb.setupGlyf(glyph["glyphs"])
     fb.setupHorizontalMetrics(glyph["metrics"]) # The default advancing width
-    fb.setupHorizontalHeader(ascent=ascent, descent=-descend)
 
-    fb.setupOS2(
-        sTypoAscender=ascent,
-        sTypoDescender=-descend,
-        usWinAscent=ascent,
-        usWinDescent=descend,
-        sxHeight=x_height,
-        sCapHeight=cap_height,
-        fsType=0, # 0: Installable embedding, 2: Restricted License embedding, 4: Preview & Print embedding, 8: Editable embedding
-        fsSelection=0x40, # "bold italic": 0x21, "bold": 0x20, "italic": 0x01, "regular": 0x40
-        usWeightClass=500, # Medium weight, as our font is kind of thick by design
-        usWidthClass=5 # Normal width, we won't have condensed or expanded width
-    )
+    hhea_table = { "ascent": ascent, "descent": -descend }
+    fsStyle, usWeight = (0x20, 700) if font_export["face"] == "bold" else (0x40, 500)
+    os2_table = {
+        "sTypoAscender": ascent,
+        "sTypoDescender": -descend,
+        "usWinAscent": ascent,
+        "usWinDescent": descend,
+        "sxHeight": x_height,
+        "sCapHeight": cap_height,
+        "fsType": 0,  # 0: Installable embedding, 2: Restricted License embedding, 4: Preview & Print embedding, 8: Editable embedding
+        "fsSelection": fsStyle,  # "bold italic": 0x21, "bold": 0x20, "italic": 0x01, "regular": 0x40
+        "usWeightClass": usWeight,  # Medium weight, as our font is kind of thick by design
+        "usWidthClass": 5  # Normal width, we won't have condensed or expanded width
+    }
+    fb.setupHorizontalHeader(**hhea_table)
+    fb.setupOS2(**os2_table)
+    # OS/2 CodePage ranges, FontBuilder doesn't do this by default for whatever reason
+    # This marks the range of Unicodes Microsoft app like MsWord are able to display
+    os2 = fb.font["OS/2"]
+    os2.recalcCodePageRanges(fb.font)
 
     license_desc: list[str] = about.__license__.splitlines()
     license_info: str = license_desc[len(license_desc) - 1]
@@ -291,68 +305,81 @@ def export(export_fn: Callable[[str], Path],
     }
 
     # Prepare .fea feature file as raw text lines
-    fea_full: list[str] = []
-    afdko_parent = FONT_DIR / font_data["features-afdko"]["parent-afdko"]
+    debug_fea: bool = "fea" in font_export["debug"]
+    features_text: str = dump_features(
+        font_data["features-afdko"]["parent-afdko"],
+        font_data["features-afdko"]["includes-fea"],
+        positioning_fea,
+        kerning_feature,
+        upm=units_per_em,
+        pixel_size=pixel_size,
+        debug=debug_fea,
+        verbose=v
+    )
 
-    if afdko_parent.is_file():
-        log(v, f"Exporting parent features file (AFDKO) for: {afdko_parent.name}")
-        includes: list[str] = font_data["features-afdko"]["includes-fea"]
-        features: str = afdko_parent.read_text()
-        fea_full.append(features)
-
-        # Include font specific features file
-        for fea_path in includes:
-            with as_file(FONT_DIR / fea_path) as fea_include_path:
-                fea_full.append(f"include({fea_include_path})")
-        fea_full.append("")
-
-    # Collect anchoring features
-    for block_name, feature in anchors_feature.items():
-        log(v, f"Exporting anchoring feature for: {block_name}")
-        anchor_txt = export_anchor_features(
-            feature,
-            upm=units_per_em,
-            pixel_size=pixel_size,
-        )
-        log(v, anchor_txt)
-        fea_full.append(anchor_txt)
-
-    # Collect kerning features
-    for block_name, kerning_path in kerning_feature.items():
-        log(v, f"Exporting kerning feature for: {block_name}")
-        kerning = load_yaml(kerning_path)
-        fea_txt = export_kerning_feat(
-            kerning["groups"],
-            kerning["kerning"],
-            upm=units_per_em,
-            pixel_size=pixel_size,
-        )
-        log(v, fea_txt)
-        fea_full.append("feature kern {")
-        fea_full.append(fea_txt)
-        fea_full.append("} kern;")
-
-    final_features_string = '\n'.join(fea_full)
-
-    fb.addOpenTypeFeatures(final_features_string)
+    fb.addOpenTypeFeatures(features_text)
 
     fb.setupNameTable(name_strings)
 
-    fb.setupPost(
-        formatType=3.0,
-        italicAngle=italic_angle,
-        underlinePosition=underline_position,
-        underlineThickness=underline_thickness,
-        isFixedPitch=0,
-        minMemType42=0,
-        maxMemType42=0,
-        minMemType1=0,
-        maxMemType1=0,
-    )
-    log(v, "Written Metadata: ", name_strings)
-    log(v, "Result glyphs orders: ", glyph["glyph_order"])
+    post_table = {
+        "formatType": 3.0,
+        "italicAngle": italic_angle,
+        "underlinePosition": underline_position,
+        "underlineThickness": underline_thickness,
+        "isFixedPitch": 0,
+        "minMemType42": 0,
+        "maxMemType42": 0,
+        "minMemType1": 0,
+        "maxMemType1": 0,
+    }
 
-    export_file = export_fn(post_script)
+    fb.setupPost(**post_table)
+    export_file = export_fn(post_script, ".ttf")
     fb.save(export_file)
+
+    # Features text can be written as a file for debugging
+    if debug_fea:
+        debg_fea = export_fn(post_script, ".fea")
+        with debg_fea.open("w", encoding="utf-8") as fea_debug:
+            fea_debug.write(features_text)
+            print(f"\033[32mWrote: {debg_fea}")
+
+    # We can dump our metadata as JSON,
+    # and some additional useful data compiled from FontBuilder
+    if "json" in font_export["debug"]:
+        debg_json = export_fn(post_script, ".json")
+        head_debg = {"unitsPerEm", "created", "modified", "glyphDataFormat", "fontRevision"}
+
+        def dump_debg_json(data, indent: int=2):
+            """Collapse lists containing up to 4 simple values onto one line"""
+            result: str = json.dumps(data, indent=indent, ensure_ascii=True)
+            pattern: str = r'\[\s*([^][\n]*(?:\n\s*[^][\n]*){0,3})\s*\]'
+
+            def collapse(match):
+                items = [item.strip() for item in match.group(1).split(",")]
+                if len(items) <= 4:
+                    return "[" + ", ".join(items) + "]"
+                return match.group(0)
+
+            return re.sub(pattern, collapse, result)
+
+        with debg_json.open("w", encoding="utf-8") as json_debug:
+            dump_json: str = dump_debg_json({
+                "name": name_strings,
+                "post": post_table,
+                "OS/2": {
+                    **os2_table,
+                    "ulUnicodeRange": list(os2.getUnicodeRanges()),
+                    "ulCodePageRange": list(os2.getCodePageRanges()),
+                },
+                "hhea": hhea_table,
+                "head": { k: getattr(fb.font["head"], k, "N/A") for k in head_debg },
+                "htmx": glyph["metrics"],
+                "glyf": glyph["glyph_order"],
+                "cmap": glyph["cmap"]
+            })
+            json_debug.write(dump_json)
+            json_debug.write("\n")
+            print(f"\033[32mWrote: {debg_json}")
 
     print(f"\033[32mWrote: {export_file}")
